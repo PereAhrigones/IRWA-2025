@@ -11,7 +11,7 @@ import math
 
 
 
-long_string_cat = ["title", "description", "brand", "category", "sub_category", "product_details", "seller"]
+long_string_cat = ["title", "description", "brand", "category", "sub_category", "product_details", "seller"] # Fields to be combined for 'line' field (based on our criteria)
 
 
 
@@ -26,13 +26,16 @@ def search_in_corpus(query):
 
 
 def build_terms(field):
+    '''
+    Function to process a text field into a list of terms as asked in point 1 of part_1
+    '''
     stemmer = PorterStemmer()
     stop_words = set(stopwords.words('english'))
-    line = field.lower()
+    line = field.lower() # Lowercase
     line = re.sub(r'([.,])([^\s])', r'\1 \2', line)  # Add space after punctuation if missing
-    line = line.split()
-    line = [word for word in line if word not in stop_words]
-    line = [stemmer.stem(word) for word in line]
+    line = line.split() # Tokenize
+    line = [word for word in line if word not in stop_words] # Remove stopwords
+    line = [stemmer.stem(word) for word in line] # Stemming
     return line
 
 def create_index_tfidf(documents, num_documents):
@@ -51,34 +54,21 @@ def create_index_tfidf(documents, num_documents):
     idf - inverse document frequency of each term
     """
 
-    index = defaultdict(list)
+    index = defaultdict(list)   # inverted index
     tf = defaultdict(list)  # term frequencies of terms in documents (documents in the same order as in the main index)
     df = defaultdict(int)  # document frequencies of terms in the corpus
-    title_index = defaultdict(str)
-    idf = defaultdict(float)
+    title_index = defaultdict(str)  # to map document ids to titles
+    idf = defaultdict(float) # inverse document frequencies of terms in the corpus
 
     for doc_id, doc in documents.items():
-        doc_id = str(doc_id)
+        doc_id = str(doc_id) # make sure doc_id is string
         terms = doc.line
         title = doc.title
         title_index[doc_id] = title
 
-        ## ===============================================================
-        ## create the index for the **current page** and store it in current_page_index
-        ## current_page_index ==> { ‘term1’: [current_doc, [list of positions]], ...,‘term_n’: [current_doc, [list of positions]]}
-
-        ## Example: if the curr_doc has id 1 and his text is
-        ##"web retrieval information retrieval":
-
-        ## current_page_index ==> { ‘web’: [1, [0]], ‘retrieval’: [1, [1,4]], ‘information’: [1, [2]]}
-
-        ## the term ‘web’ appears in document 1 in positions 0,
-        ## the term ‘retrieval’ appears in document 1 in positions 1 and 4
-        ## ===============================================================
-
         current_page_index = {}
 
-        for position, term in enumerate(terms):  ## terms contains page_title + page_text
+        for position, term in enumerate(terms):  ## terms contains all termns in long_string_cat fields of current document
             try:
                 # if the term is already in the dict append the position to the corresponding list
                 current_page_index[term][1].append(position)
@@ -87,74 +77,93 @@ def create_index_tfidf(documents, num_documents):
                 current_page_index[term]=[doc_id, array('I',[position])] #'I' indicates unsigned int (int in Python)
 
         #normalize term frequencies
-        # Compute the denominator to normalize term frequencies (formula 2 above)
         # norm is the same for all terms of a document.
+
+        # norm calculation
         norm = 0
         for term, posting in current_page_index.items():
             # posting will contain the list of positions for current term in current document.
             # posting ==> [current_doc, [list of positions]]
-            # you can use it to infer the frequency of current term.
             norm += len(posting[1]) ** 2
         norm = math.sqrt(norm)
 
-        # calculate the tf(dividing the term frequency by the above computed norm) and df weights
+        # tf and df weights calculation (dividing the term frequency by the above computed norm) 
         for term, posting in current_page_index.items():
             # append the tf for current term (tf = term frequency in current doc/norm)
             tf[term].append(np.round(len(posting[1])/norm,4)) ## SEE formula (1) above
             #increment the document frequency of current term (number of documents containing the current term)
             df[term] += 1 # increment DF for current term
 
-        #merge the current page index with the main index
+        #merge the current index with the main index
         for term_page, posting_page in current_page_index.items():
             index[term_page].append(posting_page)
 
-    # Compute IDF following the formula (3) above. HINT: use np.log
-    # Note: It is computed later after we know the df.
+    # IDF calculation following the formula (3) above
     for term in df:
         idf[term] = np.round(np.log(float(num_documents/df[term])), 4)
 
     return index, tf, df, idf, title_index
 
 def compute_line_docs(documents):
+    '''
+    Function to compute the 'line' field for each document by combining specified text fields
+    Argument:
+    documents -- dictionary of Document objects (the corpus)
+    Returns:
+    documents -- updated dictionary of Document objects with 'line' field computed
+    '''
     for doc in documents.values():
+        '''
+         Combine specified text fields into the 'line' field of Document for search indexing
+         '''
         combined_fields = []
-        for field_name in long_string_cat:
+        for field_name in long_string_cat: # Fields to be combined for 'line' field
             field_value = getattr(doc, field_name)
             if field_value and isinstance(field_value, str):
                 combined_fields.append(field_value)
-            elif field_value and isinstance(field_value, dict):
+            elif field_value and isinstance(field_value, dict): # For product_details which is a dict
                 combined_fields.append(" ".join(str(v) for v in field_value.values()))
         combined_text = " ".join(combined_fields)
-        doc.line = build_terms(combined_text)
+        doc.line = build_terms(combined_text) # Process combined text into terms
     return documents
 
 def rank_documents(terms, docs, index, idf, tf, title_index):
-    doc_vectors = defaultdict(lambda: [0] * len(terms))
-    query_vector = [0] * len(terms)
+    ''' 
+    Rank documents based on cosine similarity between query and document vectors using TF-IDF weights
+    Arguments:
+    terms -- list of processed query terms
+    docs -- list of document IDs to rank
+    index -- inverted index
+    idf -- inverse document frequencies
+    tf -- term frequencies
+    title_index -- mapping of document IDs to titles (not needed for ranking for now)
+    '''
+    doc_vectors = defaultdict(lambda: [0] * len(terms)) # document vectors initialized to zero
+    query_vector = [0] * len(terms) # query vector initialized to zero
 
-    query_terms_count = collections.Counter(terms)
+    query_terms_count = collections.Counter(terms)  # term frequency in query
 
-    query_norm = la.norm(list(query_terms_count.values()))
+    query_norm = la.norm(list(query_terms_count.values())) # norm of query vector
 
-    for term_idx, term in enumerate(terms):
-        if term not in index:
+    for term_idx, term in enumerate(terms): # iterate over query terms
+        if term not in index: # term not in corpus
             continue
 
-        query_vector[term_idx] = (query_terms_count[term] / query_norm) * idf[term]
+        query_vector[term_idx] = (query_terms_count[term] / query_norm) * idf[term] # compute query vector component
 
-        for doc_idx, posting in enumerate(index[term]):
+        for doc_idx, posting in enumerate(index[term]): # iterate over postings for the term
             try:
-                doc_id = posting[0]
+                doc_id = posting[0] # get document ID
             except Exception:
                 continue
             if doc_id in docs:
-                doc_vectors[doc_id][term_idx] = tf[term][doc_idx] * idf[term]
+                doc_vectors[doc_id][term_idx] = tf[term][doc_idx] * idf[term] # compute document vector component
 
-    doc_scores = [[np.dot(curDocVec, query_vector), doc] for doc, curDocVec in doc_vectors.items()]
-    doc_scores.sort(reverse=True)
-    result_docs = [x[1] for x in doc_scores]
+    doc_scores = [[np.dot(curDocVec, query_vector), doc] for doc, curDocVec in doc_vectors.items()] # compute cosine similarity scores
+    doc_scores.sort(reverse=True) # sort documents by score
+    result_docs = [x[1] for x in doc_scores] # extract sorted document IDs
 
-    if len(result_docs) == 0:
+    if len(result_docs) == 0:  # no results found
         print("No results found :(")
         query = input()
         docs = search_tfidf(query, index)
@@ -162,18 +171,19 @@ def rank_documents(terms, docs, index, idf, tf, title_index):
     return result_docs
 
 def search_tfidf(query, index, idf, tf, title_index):
-    query = build_terms(query)
+    '''Search for documents using the TF-IDF model.'''
+    query = build_terms(query) # process query
     docs = set()
-    for term in query:
+    for term in query: # iterate over query terms
         try:
-            term_docs = [posting[0] for posting in index[term]]
+            term_docs = [posting[0] for posting in index[term]] # get documents containing the term
 
-            docs.update(term_docs)
+            docs.update(term_docs) # add to result set
         except:
             pass
 
     docs = list(docs)
-    ranked_docs = rank_documents(query, docs, index, idf, tf, title_index)
+    ranked_docs = rank_documents(query, docs, index, idf, tf, title_index) # rank documents
     return ranked_docs
 
 
