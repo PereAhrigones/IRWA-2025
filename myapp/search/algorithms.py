@@ -58,7 +58,7 @@ def create_index_tfidf(documents, num_documents):
     idf = defaultdict(float)
 
     for doc_id, doc in documents.items():
-        doc_id = int(doc_id)
+        doc_id = str(doc_id)
         terms = doc.line
         title = doc.title
         title_index[doc_id] = title
@@ -155,7 +155,7 @@ def rank_documents(terms, docs, index, idf, tf, title_index):
 
     return result_docs
 
-def search_tfidf(query, index):
+def search_tfidf(query, index, idf, tf, title_index):
     query = build_terms(query)
     docs = set()
     for term in query:
