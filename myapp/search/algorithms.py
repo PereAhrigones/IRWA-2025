@@ -120,8 +120,10 @@ def compute_line_docs(documents):
         combined_fields = []
         for field_name in long_string_cat:
             field_value = getattr(doc, field_name)
-            if field_value:
+            if field_value and isinstance(field_value, str):
                 combined_fields.append(field_value)
+            elif field_value and isinstance(field_value, dict):
+                combined_fields.append(" ".join(str(v) for v in field_value.values()))
         combined_text = " ".join(combined_fields)
         doc.line = build_terms(combined_text)
     return documents
