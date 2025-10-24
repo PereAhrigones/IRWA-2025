@@ -142,9 +142,13 @@ def rank_documents(terms, docs, index, idf, tf, title_index):
 
         query_vector[term_idx] = (query_terms_count[term] / query_norm) * idf[term]
 
-        for doc_idx, (doc, postings) in enumerate(index[term].items()):
-            if doc in docs:
-                doc_vectors[doc][term_idx] = tf[term][doc_idx] * idf[term]
+        for doc_idx, posting in enumerate(index[term]):
+            try:
+                doc_id = posting[0]
+            except Exception:
+                continue
+            if doc_id in docs:
+                doc_vectors[doc_id][term_idx] = tf[term][doc_idx] * idf[term]
 
     doc_scores = [[np.dot(curDocVec, query_vector), doc] for doc, curDocVec in doc_vectors.items()]
     doc_scores.sort(reverse=True)
