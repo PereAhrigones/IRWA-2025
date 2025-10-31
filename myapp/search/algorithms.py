@@ -171,19 +171,27 @@ def rank_documents(terms, docs, index, idf, tf, title_index):
     return result_docs
 
 def search_tfidf(query, index, idf, tf, title_index):
-    '''Search for documents using the TF-IDF model.'''
-    query = build_terms(query) # process query
-    docs = set()
-    for term in query: # iterate over query terms
-        try:
-            term_docs = [posting[0] for posting in index[term]] # get documents containing the term
+    '''Search for documents using the TF-IDF model. Returns only documents that contain ALL query terms.'''
+    query_terms = build_terms(query) # process query into terms
 
-            docs.update(term_docs) # add to result set
-        except:
-            pass
+    if not query_terms: # If no query terms, return empty list
+        return []
 
-    docs = list(docs)
-    ranked_docs = rank_documents(query, docs, index, idf, tf, title_index) # rank documents
+    docs_intersection = None
+    for term in query_terms: # if term not in index, no document contains it -> no results
+        if term not in index:
+            return []
+        term_docs = {posting[0] for posting in index[term]}
+        if docs_intersection is None:
+            docs_intersection = term_docs
+        else:
+            docs_intersection &= term_docs
+
+    if not docs_intersection:
+        return []
+
+    docs = list(docs_intersection)
+    ranked_docs = rank_documents(query_terms, docs, index, idf, tf, title_index) # rank documents
     return ranked_docs
 
 
