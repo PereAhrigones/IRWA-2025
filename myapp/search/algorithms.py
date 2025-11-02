@@ -195,3 +195,52 @@ def search_tfidf(query, index, idf, tf, title_index):
     return ranked_docs
 
 
+###### PART 2 ALGORITHMS #####
+
+def select_queries(queries, all_queries):
+    queries_selected = []
+    for q in queries:
+        q_temp = all_queries[all_queries['title'] == q]
+        queries_selected.append(q_temp)
+    return queries_selected
+
+
+
+def precision_at_K(query_selected,ranked_docs, k):
+    # we suppose that all docs are in query_selected
+    relevant = []
+    cap = len(ranked_docs)
+    for r in range(min(k,cap)):
+        query_row = query_selected[query_selected["pid"] == ranked_docs[r]]
+        l = query_row["labels"]
+        if not l.empty:
+            relevant.append(int(l.iloc[0]))
+    if relevant:
+        return sum(relevant)/k
+    return 0
+
+
+def recall_at_K():
+    # do nothing
+    return 0
+
+def average_precision():
+    # do nothing
+    return 0
+
+def f1_score_at_K():
+    # do nothing
+    return 0
+
+def mean_average_precision():
+    # do nothing
+    return 0
+
+def mean_reciprocalr_rank():
+    # do nothing
+    return 0
+
+def NDCG():
+    # do nothing
+    return 0
+

@@ -1,0 +1,8 @@
+Resumen de las data_structures:
+- docs: (lista de Obj Documento)  Donde están todos los documentos en su formato
+- queries: (lista de strings)     Lista de todas las queries (en teoria 5)
+- queries_real: (pd.dataframe)    Dataframe de todas las labels para parejas label-documentos
+- ranked_docs: (lista de strings) Lista de los pid de los documentos rankeados en orden (de más a menos)
+
+# falta explicar
+- index, idf, tf, title_index
