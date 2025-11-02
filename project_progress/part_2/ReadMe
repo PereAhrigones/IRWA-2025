@@ -3,6 +3,23 @@ Resumen de las data_structures:
 - queries: (lista de strings)     Lista de todas las queries (en teoria 5)
 - queries_real: (pd.dataframe)    Dataframe de todas las labels para parejas label-documentos
 - ranked_docs: (lista de strings) Lista de los pid de los documentos rankeados en orden (de más a menos)
+- index: Un diccionario de python que contiene los términos y los respectivos documentos y posiciones en los que se encuentra.
+- idf: La freqüencia inversa de los términos.
+- tf: La frequëncia normalizada de cada término
+- title_index: Un diccionario de python que mapea los ids de los documentos a sus títulos.
 
-# falta explicar
-- index, idf, tf, title_index
+Ejecución
+
+Las primeras celdas son para importar librerias y el json de fashon_products.
+Seguidamente se ejecuta una celda para introducir a cada ducumento su "line" correspondiente donde en esta "line" 
+está la combinación de strings de todos los campos del documento que son string. Incluídos los del product details.
+Aquí es donde se han aplicado las funciones build_terms y compute_line_docs.
+
+La siguiente celda crea el índice invertido y la celda a continuación permite hacer una búsqueda para comprobar que todo va bien hasta el momento.
+
+Las 5 queries que hemos escogido se pueden ver en el report de esta parte.
+
+Luego comienza la siguiente parte del entregable donde aplicamos métricas de evaluación.
+Empezamos cargando el csv con las queries de prueba proporcionadas por los profesores.
+A continuación se ejecuta cada métrica implementada. Las funciones se pueden ver en el archivo algorithms.py.
+Finalmente usamos las queries que hemos seleccionado y manualmente decidimos si cada resultado es realmente relevante o no. El resultado para cada query se guarda en un dataframe para que pueda ser fácilmente exportado a un csv.
