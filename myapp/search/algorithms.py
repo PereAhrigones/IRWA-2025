@@ -206,10 +206,12 @@ def select_queries(queries, all_queries):
 
 
 
-def precision_at_K(query_selected,ranked_docs, k):
+def precision_at_K(query_selected, ranked_docs, k):
     # we suppose that all docs are in query_selected
     relevant = []
     cap = len(ranked_docs)
+    #print("Total: "+str(cap))
+
     for r in range(min(k,cap)):
         query_row = query_selected[query_selected["pid"] == ranked_docs[r]]
         l = query_row["labels"]
@@ -220,24 +222,115 @@ def precision_at_K(query_selected,ranked_docs, k):
     return 0
 
 
-def recall_at_K():
-    # do nothing
+def recall_at_K(query_selected, ranked_docs, k):
+    # we suppose that all docs are in query_selected
+    relevant = []
+    cap = len(ranked_docs)
+    total = query_selected["labels"].sum()
+
+    for r in range(min(k,cap)): # we suppose that if we want to rank a k larger than the ranked documents we still lose precision as we can't find more documents which means not relevant documents
+        query_row = query_selected[query_selected["pid"] == ranked_docs[r]]
+        l = query_row["labels"]
+        if not l.empty:
+            relevant.append(int(l.iloc[0]))
+    if relevant:
+        return sum(relevant)/total
     return 0
 
-def average_precision():
-    # do nothing
+def average_precision(query_selected, ranked_docs):
+    # we suppose that all docs are in query_selected
+    relevant = 0
+    cap = len(ranked_docs)
+    relevance_in_rank = []
+
+    for r in range(cap):
+        query_row = query_selected[query_selected["pid"] == ranked_docs[r]]
+        l = query_row["labels"]
+        if not l.empty:
+            relevant_q = int(l.iloc[0])
+            if relevant_q > 0:
+                relevant += 1
+                relevance_in_rank.append(relevant/r)
+    
+    if relevance_in_rank:
+        return sum(relevance_in_rank)/len(relevance_in_rank)
+    return 0
+    
+
+def f1_score_at_K(query_selected, ranked_docs, k):
+    p_p = precision_at_K(query_selected, ranked_docs, k)
+    r_r = recall_at_K(query_selected, ranked_docs, k)
+
+    if p_p * r_r:
+        return 2/((1/p_p)+(1/r_r))
     return 0
 
-def f1_score_at_K():
-    # do nothing
+def f1_score_at_K_optimized(query_selected, ranked_docs, k):
+    # we suppose that all docs are in query_selected
+    relevant = []
+    cap = len(ranked_docs)
+    total = query_selected["labels"].sum()
+
+    for r in range(min(k,cap)):
+        query_row = query_selected[query_selected["pid"] == ranked_docs[r]]
+        l = query_row["labels"]
+        if not l.empty:
+            relevant.append(int(l.iloc[0]))
+    if relevant:
+        return 2*sum(relevant)/(k+total)
+
     return 0
 
-def mean_average_precision():
-    # do nothing
+def mean_average_precision(queries_real, index, idf, tf, title_index, only = []):
+    map_map = []
+    if only:
+        queries = only #mirar solo las queries estas
+    else:
+        queries = queries_real["title"].astype(str).unique().tolist() #mirar todas las del dataframe
+
+    queries_sel = select_queries(queries, queries_real)
+
+    for i, q in enumerate(queries_sel):
+        ranked_docs_t = search_tfidf(queries[i], index, idf, tf, title_index)
+        avgprecision_t = average_precision(q, ranked_docs_t)
+        map_map.append(avgprecision_t)
+        # print(avgprecision_t)
+    
+    if map_map:
+        return sum(map_map)/len(map_map)
     return 0
 
-def mean_reciprocalr_rank():
-    # do nothing
+
+def reciprocal_rank(query_sel, ranked_docs, k):
+    cap = len(ranked_docs)
+    first = 0
+    for r in range(min(k,cap)):
+        query_row = query_sel[query_sel["pid"] == ranked_docs[r]]
+        l = query_row["labels"]
+        if not l.empty:
+            relevant = (int(l.iloc[0]))
+            if relevant>0:
+                return(1/r)
+    return 0
+
+
+def mean_reciprocal_rank(queries_real, index, idf, tf, title_index, k, only = []):
+    mrr = []
+    if only:
+        queries = only #mirar solo las queries estas
+    else:
+        queries = queries_real["title"].astype(str).unique().tolist() #mirar todas las del dataframe
+
+    queries_sel = select_queries(queries, queries_real)
+
+    for i, q in enumerate(queries_sel):
+        ranked_docs_t = search_tfidf(queries[i], index, idf, tf, title_index)
+        rrt = reciprocal_rank(q, ranked_docs_t, k)
+        mrr.append(rrt)
+        # print(avgprecision_t)
+    
+    if mrr:
+        return sum(mrr)/len(mrr)
     return 0
 
 def NDCG():
