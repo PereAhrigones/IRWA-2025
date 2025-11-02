@@ -109,7 +109,7 @@ def create_index_tfidf(documents, num_documents):
 
     return index, tf, df, idf, title_index
 
-def create_index_tfidf_log(documents, num_documents):
+def create_index_tfidf_log(documents, num_documents): # THIS VERSION USES TF IN A LOGARITHMIC SCALE
     """
     Implement the inverted index and compute tf, df and idf
 
@@ -246,7 +246,7 @@ def rank_documents(terms, docs, index, idf, tf, title_index):
 
     return result_docs
 
-def rank_documents_log(terms, docs, index, idf, tf, title_index):
+def rank_documents_log(terms, docs, index, idf, tf, title_index): # THIS VERSION USES TF FOR THE QUERY IN A LOGARITHMIC SCALE
     ''' 
     Rank documents based on cosine similarity between query and document vectors using TF-IDF weights
     Arguments:
@@ -339,8 +339,13 @@ def search_tfidf(query, index, idf, tf, title_index, log = 0):
 
 ###### PART 2 ALGORITHMS #####
 
-def select_queries(queries, all_queries):
-    queries_selected = []
+def select_queries(queries, all_queries): # select only the queries in the dataframe
+    """
+    queries: list of queries to select
+    all_queries: dataframe with all the queries and their labels
+    returns: list of dataframes with the selected queries
+    """
+    queries_selected = [] # list of dataframes
     for q in queries:
         q_temp = all_queries[all_queries['title'] == q]
         queries_selected.append(q_temp)
@@ -348,25 +353,37 @@ def select_queries(queries, all_queries):
 
 
 
-def precision_at_K(query_selected, ranked_docs, k):
+def precision_at_K(query_selected, ranked_docs, k): # precision at K
     # we suppose that all docs are in query_selected
+    """
+    query_selected: dataframe with the selected query and its labels
+    ranked_docs: list of ranked documents
+    k: int
+    returns: precision at K
+    """
     relevant = []
     cap = len(ranked_docs)
     #print("Total: "+str(cap))
 
-    for r in range(min(k,cap)):
-        query_row = query_selected[query_selected["pid"] == ranked_docs[r]]
-        l = query_row["labels"]
-        if not l.empty:
-            relevant.append(int(l.iloc[0]))
-    if relevant:
-        return sum(relevant)/k
-    return 0
+    for r in range(min(k,cap)): # to not exceed the number of ranked documents
+        query_row = query_selected[query_selected["pid"] == ranked_docs[r]] # get the row of the document
+        l = query_row["labels"] # get the label
+        if not l.empty: # if the document has a label
+            relevant.append(int(l.iloc[0])) # append the label (1 or 0)
+    if relevant: # if there are relevant documents
+        return sum(relevant)/k # TP/(TP+FP)
+    return 0 # else 0
 
 
 def recall_at_K(query_selected, ranked_docs, k):
     # we suppose that all docs are in query_selected
-    relevant = []
+    """
+    query_selected: dataframe with the selected query and its labels
+    ranked_docs: list of ranked documents
+    k: int
+    returns: recall at K
+    """
+    relevant = [] # same as precision at K but dividing by total relevant documents
     cap = len(ranked_docs)
     total = query_selected["labels"].sum()
 
@@ -376,14 +393,19 @@ def recall_at_K(query_selected, ranked_docs, k):
         if not l.empty:
             relevant.append(int(l.iloc[0]))
     if relevant:
-        return sum(relevant)/total
+        return sum(relevant)/total # TP/(TP+FN)
     return 0
 
 def average_precision(query_selected, ranked_docs):
     # we suppose that all docs are in query_selected
-    relevant = 0
-    cap = len(ranked_docs)
-    relevance_in_rank = []
+    """
+    query_selected: dataframe with the selected query and its labels
+    ranked_docs: list of ranked documents
+    returns: average precision
+    """
+    relevant = 0 # count of relevant documents found
+    cap = len(ranked_docs) # total number of ranked documents
+    relevance_in_rank = [] # list of precision at each relevant document found
 
     for r in range(cap):
         query_row = query_selected[query_selected["pid"] == ranked_docs[r]]
@@ -391,77 +413,116 @@ def average_precision(query_selected, ranked_docs):
         if not l.empty:
             relevant_q = int(l.iloc[0])
             if relevant_q > 0:
-                relevant += 1
-                relevance_in_rank.append(relevant/r)
+                relevant += 1 # count relevant documents found until position r
+                relevance_in_rank.append(relevant/r) # precision at position r
     
     if relevance_in_rank:
-        return sum(relevance_in_rank)/len(relevance_in_rank)
+        return sum(relevance_in_rank)/len(relevance_in_rank) # average precision
     return 0
     
 
 def f1_score_at_K(query_selected, ranked_docs, k):
-    p_p = precision_at_K(query_selected, ranked_docs, k)
-    r_r = recall_at_K(query_selected, ranked_docs, k)
+    # we suppose that all docs are in query_selected
+    """
+    query_selected: dataframe with the selected query and its labels
+    ranked_docs: list of ranked documents
+    k: int
+    returns: f1 score at K
+    """
+    p_p = precision_at_K(query_selected, ranked_docs, k) # precision at K
+    r_r = recall_at_K(query_selected, ranked_docs, k) # recall at K
 
-    if p_p * r_r:
-        return 2/((1/p_p)+(1/r_r))
+    if p_p * r_r: # to avoid division by zero
+        return 2/((1/p_p)+(1/r_r)) # 2*P*R/(P+R), harmonic mean
     return 0
 
-def f1_score_at_K_optimized(query_selected, ranked_docs, k):
+def f1_score_at_K_optimized(query_selected, ranked_docs, k): # optimized version to not calculate twice
     # we suppose that all docs are in query_selected
-    relevant = []
-    cap = len(ranked_docs)
-    total = query_selected["labels"].sum()
+    """
+    query_selected: dataframe with the selected query and its labels
+    ranked_docs: list of ranked documents
+    k: int
+    returns: f1 score at K
+    """
+    relevant = [] # to store relevant documents found
+    cap = len(ranked_docs) # total number of ranked documents
+    total = query_selected["labels"].sum() # total number of relevant documents
 
     for r in range(min(k,cap)):
         query_row = query_selected[query_selected["pid"] == ranked_docs[r]]
         l = query_row["labels"]
         if not l.empty:
-            relevant.append(int(l.iloc[0]))
+            relevant.append(int(l.iloc[0])) # same logic as precision and recall at K
     if relevant:
-        return 2*sum(relevant)/(k+total)
+        return 2*sum(relevant)/(k+total) # simplified formula for F1 score
 
     return 0
 
 def mean_average_precision(queries_real, index, idf, tf, title_index, log = 0, only = []):
-    map_map = []
-    if only:
-        queries = only #mirar solo las queries estas
+    """
+    query_real: dataframe with all the queries and their labels
+    index: inverted index
+    idf: inverse document frequency
+    tf: term frequency
+    title_index: title index
+    log: int (1 for log functions, 0 for normal)
+    only: list of queries to consider instead of all
+    returns: mean average precision
+    """
+    map_map = [] # list of average precisions
+    if only: # if only is not empty
+        queries = only # only consider these queries
     else:
-        queries = queries_real["title"].astype(str).unique().tolist() #mirar todas las del dataframe
+        queries = queries_real["title"].astype(str).unique().tolist() # consider all unique queries in the dataframe
 
-    queries_sel = select_queries(queries, queries_real)
+    queries_sel = select_queries(queries, queries_real) # select the queries from the dataframe
 
-    for i, q in enumerate(queries_sel):
-        ranked_docs_t = search_tfidf(queries[i], index, idf, tf, title_index, log)
-        avgprecision_t = average_precision(q, ranked_docs_t)
-        map_map.append(avgprecision_t)
+    for i, q in enumerate(queries_sel): # for each selected query
+        ranked_docs_t = search_tfidf(queries[i], index, idf, tf, title_index, log) # search for ranked documents
+        avgprecision_t = average_precision(q, ranked_docs_t) # compute average precision
+        map_map.append(avgprecision_t) # append to list
         # print(avgprecision_t)
     
-    if map_map:
-        return sum(map_map)/len(map_map)
+    if map_map: # if there are average precisions computed
+        return sum(map_map)/len(map_map) # return mean average precision
     return 0
 
 
 def reciprocal_rank(query_sel, ranked_docs, k):
-    cap = len(ranked_docs)
-    first = 0
-    for r in range(min(k,cap)):
+    """
+    query_sel: dataframe with the selected query and its labels
+    ranked_docs: list of ranked documents
+    k: int
+    returns: reciprocal rank at K
+    """
+    cap = len(ranked_docs) 
+    # first = 0
+    for r in range(min(k,cap)): 
         query_row = query_sel[query_sel["pid"] == ranked_docs[r]]
         l = query_row["labels"]
         if not l.empty:
             relevant = (int(l.iloc[0]))
             if relevant>0:
-                return(1/r)
+                return(1/r) # first relevant document found
     return 0
 
 
 def mean_reciprocal_rank(queries_real, index, idf, tf, title_index, k, log = 0, only = []):
+    """
+    queries_real: dataframe with all the queries and their labels
+    index: inverted index
+    idf: inverse document frequency
+    tf: term frequency
+    title_index: title index
+    log: int (1 for log functions, 0 for normal)
+    only: list of queries to consider instead of all
+    returns: mean reciprocal rank
+    """
     mrr = []
     if only:
-        queries = only #mirar solo las queries estas
+        queries = only
     else:
-        queries = queries_real["title"].astype(str).unique().tolist() #mirar todas las del dataframe
+        queries = queries_real["title"].astype(str).unique().tolist() # same as in mean average precision
 
     queries_sel = select_queries(queries, queries_real)
 
@@ -472,39 +533,45 @@ def mean_reciprocal_rank(queries_real, index, idf, tf, title_index, k, log = 0, 
         # print(avgprecision_t)
     
     if mrr:
-        return sum(mrr)/len(mrr)
+        return sum(mrr)/len(mrr) # mean reciprocal rank (all same logic as mean average precision)
     return 0
 
 def NDCG(query_selected, ranked_docs, k):
-    relevant = {}
-    ideal_relevance = []
-    real_dcg = 0
-    ideal_dcg = 0
-    cap = len(ranked_docs)
+    """
+    query_selected: dataframe with the selected query and its labels
+    ranked_docs: list of ranked documents
+    k: int
+    returns: NDCG score at K
+    """
+    relevant = {} # dictionary to store relevance at each position
+    ideal_relevance = [] # list to store ideal relevance
+    real_dcg = 0 # real DCG
+    ideal_dcg = 0 # ideal DCG
+    cap = len(ranked_docs) # total number of ranked documents
     
 
-    for r in range(min(k,cap)): # we suppose that if we want to rank a k larger than the ranked documents we still lose precision as we can't find more documents which means not relevant documents
+    for r in range(min(k,cap)): 
         query_row = query_selected[query_selected["pid"] == ranked_docs[r]]
         l = query_row["labels"]
         if not l.empty:
             l = int(l.iloc[0])
             if l > 0:
-                relevant[r+1] = l # posiciones: 1, 2, 3, 4, ....
+                relevant[r+1] = l # positions: 1, 2, 3, 4, .... (not 0-indexed but 1-indexed)
     if relevant:
         i = 0
         for position, relevance in relevant.items():
-            print(relevance)
-            i+=1 # i empieza en 1
-            real_dcg += ((2**relevance) - 1)/np.log2(1+position)
-            ideal_relevance.append(relevance)
+            i+=1 # i starts at 1
+            real_dcg += ((2**relevance) - 1)/np.log2(1+position) # formula for DCG
+            ideal_relevance.append(relevance) # build ideal relevance list
 
-        ideal_relevance = sorted(ideal_relevance, reverse=True)
-        for i, rel in enumerate(ideal_relevance):
+        ideal_relevance = sorted(ideal_relevance, reverse=True) # sort ideal relevance in descending order
+        for i, rel in enumerate(ideal_relevance): 
             if rel > 0:
-                ideal_dcg += (2**rel - 1) / np.log2(i + 2) # i empieza en 0 aquí
+                ideal_dcg += (2**rel - 1) / np.log2(i + 2) # i starts at 0 here, create ideal DCG
         return real_dcg/ideal_dcg
     
     return 0
+            # print(relevance)
 
             # print("Relevance: "+str(relevance))
             # print("Relevance 2** : "+str(2**relevance))
