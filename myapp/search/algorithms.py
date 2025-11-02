@@ -346,8 +346,9 @@ def select_queries(queries, all_queries): # select only the queries in the dataf
     returns: list of dataframes with the selected queries
     """
     queries_selected = [] # list of dataframes
-    for q in queries:
-        q_temp = all_queries[all_queries['title'] == q]
+    for q in range(len(queries)):
+        #print(q)
+        q_temp = all_queries[all_queries['query_id'] == q+1]
         queries_selected.append(q_temp)
     return queries_selected
 
@@ -458,7 +459,7 @@ def f1_score_at_K_optimized(query_selected, ranked_docs, k): # optimized version
 
     return 0
 
-def mean_average_precision(queries_real, index, idf, tf, title_index, log = 0, only = []):
+def mean_average_precision(queries_real, queries_test, index, idf, tf, title_index, log = 0, only_id = []):
     """
     query_real: dataframe with all the queries and their labels
     index: inverted index
@@ -466,14 +467,19 @@ def mean_average_precision(queries_real, index, idf, tf, title_index, log = 0, o
     tf: term frequency
     title_index: title index
     log: int (1 for log functions, 0 for normal)
-    only: list of queries to consider instead of all
+    only_id: list of queries to consider instead of all
     returns: mean average precision
     """
     map_map = [] # list of average precisions
-    if only: # if only is not empty
-        queries = only # only consider these queries
+    if only_id: # if only is not empty
+        queries_id = only_id # only consider these queries
     else:
-        queries = queries_real["title"].astype(str).unique().tolist() # consider all unique queries in the dataframe
+        queries_id = queries_real["query_id"].astype(int).unique().tolist() # consider all unique queries in the dataframe
+
+    queries = []    
+    
+    for qid in queries_id:
+        queries.append(queries_test[qid-1]) # get the query text from the test dataframe
 
     queries_sel = select_queries(queries, queries_real) # select the queries from the dataframe
 
@@ -498,31 +504,42 @@ def reciprocal_rank(query_sel, ranked_docs, k):
     cap = len(ranked_docs) 
     # first = 0
     for r in range(min(k,cap)): 
-        query_row = query_sel[query_sel["pid"] == ranked_docs[r]]
-        l = query_row["labels"]
-        if not l.empty:
-            relevant = (int(l.iloc[0]))
-            if relevant>0:
-                return(1/r) # first relevant document found
-    return 0
+        query_row = query_sel[query_sel["pid"].astype(str) == str(ranked_docs[r])]
+        if query_row.empty:
+            # No matching row, skip or do nothing
+            continue
+        else:
+            l = query_row["labels"]
+            if not l.empty:
+                relevant = (int(l.iloc[0]))
+                if relevant>0:
+                    return(1/r+1) # first relevant document found
+    
+    return 1 / (r + 1)
 
 
-def mean_reciprocal_rank(queries_real, index, idf, tf, title_index, k, log = 0, only = []):
+def mean_reciprocal_rank(queries_real, queries_test, index, idf, tf, title_index, k, log = 0, only_id = []):
     """
     queries_real: dataframe with all the queries and their labels
+    queries_test: list of query texts
     index: inverted index
     idf: inverse document frequency
     tf: term frequency
     title_index: title index
     log: int (1 for log functions, 0 for normal)
-    only: list of queries to consider instead of all
+    only_id: list of queries to consider instead of all
     returns: mean reciprocal rank
     """
     mrr = []
-    if only:
-        queries = only
+    if only_id: # if only is not empty
+        queries_id = only_id # only consider these queries
     else:
-        queries = queries_real["title"].astype(str).unique().tolist() # same as in mean average precision
+        queries_id = queries_real["query_id"].astype(int).unique().tolist() # consider all unique queries in the dataframe
+
+    queries = []    
+    
+    for qid in queries_id:
+        queries.append(queries_test[qid-1]) # get the query text from the test dataframe
 
     queries_sel = select_queries(queries, queries_real)
 
