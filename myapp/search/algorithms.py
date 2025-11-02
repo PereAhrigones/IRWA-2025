@@ -415,7 +415,7 @@ def average_precision(query_selected, ranked_docs):
             relevant_q = int(l.iloc[0])
             if relevant_q > 0:
                 relevant += 1 # count relevant documents found until position r
-                relevance_in_rank.append(relevant/r) # precision at position r
+                relevance_in_rank.append(relevant/(r+1)) # precision at position r
     
     if relevance_in_rank:
         return sum(relevance_in_rank)/len(relevance_in_rank) # average precision
@@ -513,7 +513,7 @@ def reciprocal_rank(query_sel, ranked_docs, k):
             if not l.empty:
                 relevant = (int(l.iloc[0]))
                 if relevant>0:
-                    return(1/r+1) # first relevant document found
+                    return(1/(r+1)) # first relevant document found
     
     return 1 / (r + 1)
 
