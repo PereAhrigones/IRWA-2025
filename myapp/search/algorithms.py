@@ -536,7 +536,7 @@ def mean_reciprocal_rank(queries_real, queries_test, index, idf, tf, title_index
     else:
         queries_id = queries_real["query_id"].astype(int).unique().tolist() # consider all unique queries in the dataframe
 
-    queries = []    
+    queries = []
     
     for qid in queries_id:
         queries.append(queries_test[qid-1]) # get the query text from the test dataframe
