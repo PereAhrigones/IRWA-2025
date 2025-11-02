@@ -84,25 +84,101 @@ def create_index_tfidf(documents, num_documents):
         for term, posting in current_page_index.items():
             # posting will contain the list of positions for current term in current document.
             # posting ==> [current_doc, [list of positions]]
-            norm += len(posting[1]) ** 2
-        norm = math.sqrt(norm)
+            norm += len(posting[1]) ** 2 # tf_term ^ 2
+        norm = math.sqrt(norm) #sqrt(tf_term1 ^ 2 + tf_term2 ^ 2 + ... + tf_termN ^ 2)
 
         # tf and df weights calculation (dividing the term frequency by the above computed norm) 
         for term, posting in current_page_index.items():
             # append the tf for current term (tf = term frequency in current doc/norm)
-            tf[term].append(np.round(len(posting[1])/norm,4)) ## SEE formula (1) above
+            tf[term].append(np.round(len(posting[1])/norm,4)) ##  fij/|dj|
+
             #increment the document frequency of current term (number of documents containing the current term)
             df[term] += 1 # increment DF for current term
 
         #merge the current index with the main index
         for term_page, posting_page in current_page_index.items():
             index[term_page].append(posting_page)
+            # before index ==> { term: [ [doc1,[1,4,5]], [doc2,[2,3,7]] ] }
+            #        current_page_index ==> {term: [current_doc,[1,3,6]] }
+            #
+            # now    index ==> { term: [ [doc1,[1,4,5]], [doc2,[2,3,7]], [doc3,[1,3,6]] ] }
 
     # IDF calculation following the formula (3) above
     for term in df:
         idf[term] = np.round(np.log(float(num_documents/df[term])), 4)
 
     return index, tf, df, idf, title_index
+
+def create_index_tfidf_log(documents, num_documents):
+    """
+    Implement the inverted index and compute tf, df and idf
+
+    Argument:
+    lines -- collection of Wikipedia articles
+    num_documents -- total number of documents
+
+    Returns:
+    index - the inverted index (implemented through a Python dictionary) containing terms as keys and the corresponding
+    list of document these keys appears in (and the positions) as values.
+    tf - normalized term frequency for each term in each document
+    df - number of documents each term appear in
+    idf - inverse document frequency of each term
+    """
+
+    index_log = defaultdict(list)   # inverted index
+    tf = defaultdict(list)  # term frequencies of terms in documents (documents in the same order as in the main index)
+    df = defaultdict(int)  # document frequencies of terms in the corpus
+    title_index = defaultdict(str)  # to map document ids to titles
+    idf = defaultdict(float) # inverse document frequencies of terms in the corpus
+
+    for doc_id, doc in documents.items():
+        doc_id = str(doc_id) # make sure doc_id is string
+        terms = doc.line
+        title = doc.title
+        title_index[doc_id] = title
+
+        current_page_index = {}
+
+        for position, term in enumerate(terms):  ## terms contains all termns in long_string_cat fields of current document
+            try:
+                # if the term is already in the dict append the position to the corresponding list
+                current_page_index[term][1].append(position)
+            except:
+                # Add the new term as dict key and initialize the array of positions and add the position
+                current_page_index[term]=[doc_id, array('I',[position])] #'I' indicates unsigned int (int in Python)
+
+        #normalize term frequencies
+        # norm is the same for all terms of a document
+
+        # tf and df weights calculation (dividing the term frequency by the above computed norm) 
+        norm = 0
+        for term, posting in current_page_index.items():
+            # posting will contain the list of positions for current term in current document.
+            # posting ==> [current_doc, [list of positions]]
+            if len(posting[1]) > 0:
+                norm += (1 + np.log(len(posting[1]))) ** 2 # tf_term ^ 2
+        norm = math.sqrt(norm) #sqrt(tf_term1 ^ 2 + tf_term2 ^ 2 + ... + tf_termN ^ 2)
+        
+        for term, posting in current_page_index.items():
+            if len(posting[1]) > 0:
+                tf[term].append((1 + np.log(len(posting[1]))) / norm)
+
+            #increment the document frequency of current term (number of documents containing the current term)
+            df[term] += 1 # increment DF for current term
+
+        #merge the current index with the main index
+        for term_page, posting_page in current_page_index.items():
+            index_log[term_page].append(posting_page)
+            # before index ==> { term: [ [doc1,[1,4,5]], [doc2,[2,3,7]] ] }
+            #        current_page_index ==> {term: [current_doc,[1,3,6]] }
+            #
+            # now    index ==> { term: [ [doc1,[1,4,5]], [doc2,[2,3,7]], [doc3,[1,3,6]] ] }
+
+    # IDF calculation following the formula (3) above
+    for term in df:
+        idf[term] = np.round(np.log(float(num_documents/df[term])), 4)
+
+    return index_log, tf, df, idf, title_index
 
 def compute_line_docs(documents):
     '''
@@ -170,7 +246,70 @@ def rank_documents(terms, docs, index, idf, tf, title_index):
 
     return result_docs
 
-def search_tfidf(query, index, idf, tf, title_index):
+def rank_documents_log(terms, docs, index, idf, tf, title_index):
+    ''' 
+    Rank documents based on cosine similarity between query and document vectors using TF-IDF weights
+    Arguments:
+    terms -- list of processed query terms
+    docs -- list of document IDs to rank
+    index -- inverted index
+    idf -- inverse document frequencies
+    tf -- term frequencies
+    title_index -- mapping of document IDs to titles (not needed for ranking for now)
+    '''
+
+    doc_norms = {}
+
+    doc_vectors = defaultdict(lambda: [0] * len(terms)) # document vectors initialized to zero
+    query_vector = []
+
+    query_terms_count = collections.Counter(terms)  # term frequency in query
+
+    query_norm = la.norm(list(query_terms_count.values())) # norm of query vector
+
+    for term_idx, term in enumerate(terms): # iterate over query terms
+        if term not in index: # term not in corpus
+            continue
+
+        if term in idf:
+            tf_log_q = 1 + np.log(query_terms_count[term])
+            query_vector.append(tf_log_q * idf[term])
+        else:
+            query_vector.append(0.0)
+        
+
+        for doc_idx, posting in enumerate(index[term]): # iterate over postings for the term
+            try:
+                doc_id = posting[0] # get document ID
+            except Exception:
+                continue
+            if doc_id in docs:
+                doc_vectors[doc_id][term_idx] = tf[term][doc_idx] * idf[term] # compute document vector component
+    
+    norm_query = 0
+    for w in query_vector:
+        norm_query += float(w)**2
+    norm_query = math.sqrt(norm_query)
+    if norm_query > 0:
+        query_vector = [float(w) / norm_query for w in query_vector]
+
+    for doc, curDocVec in doc_vectors.items():
+        norm = math.sqrt(sum(float(weight) ** 2 for weight in curDocVec))
+        doc_norms[doc] = norm
+
+
+    doc_scores = [[np.dot(curDocVec, query_vector), doc] for doc, curDocVec in doc_vectors.items()] # compute cosine similarity scores #/(doc_norms[doc]*norm_query)
+    doc_scores.sort(reverse=True) # sort documents by score
+    result_docs = [x[1] for x in doc_scores] # extract sorted document IDs
+
+    if len(result_docs) == 0:  # no results found
+        print("No results found :(")
+        query = input()
+        docs = search_tfidf(query, index)
+
+    return result_docs
+
+def search_tfidf(query, index, idf, tf, title_index, log = 0):
     '''Search for documents using the TF-IDF model. Returns only documents that contain ALL query terms.'''
     query_terms = build_terms(query) # process query into terms
 
@@ -191,7 +330,10 @@ def search_tfidf(query, index, idf, tf, title_index):
         return []
 
     docs = list(docs_intersection)
-    ranked_docs = rank_documents(query_terms, docs, index, idf, tf, title_index) # rank documents
+    if log == 1:
+        ranked_docs = rank_documents_log(query_terms, docs, index, idf, tf, title_index) # rank documents
+    else:
+        ranked_docs = rank_documents(query_terms, docs, index, idf, tf, title_index) # rank documents
     return ranked_docs
 
 
@@ -281,7 +423,7 @@ def f1_score_at_K_optimized(query_selected, ranked_docs, k):
 
     return 0
 
-def mean_average_precision(queries_real, index, idf, tf, title_index, only = []):
+def mean_average_precision(queries_real, index, idf, tf, title_index, log = 0, only = []):
     map_map = []
     if only:
         queries = only #mirar solo las queries estas
@@ -291,7 +433,7 @@ def mean_average_precision(queries_real, index, idf, tf, title_index, only = [])
     queries_sel = select_queries(queries, queries_real)
 
     for i, q in enumerate(queries_sel):
-        ranked_docs_t = search_tfidf(queries[i], index, idf, tf, title_index)
+        ranked_docs_t = search_tfidf(queries[i], index, idf, tf, title_index, log)
         avgprecision_t = average_precision(q, ranked_docs_t)
         map_map.append(avgprecision_t)
         # print(avgprecision_t)
@@ -314,7 +456,7 @@ def reciprocal_rank(query_sel, ranked_docs, k):
     return 0
 
 
-def mean_reciprocal_rank(queries_real, index, idf, tf, title_index, k, only = []):
+def mean_reciprocal_rank(queries_real, index, idf, tf, title_index, k, log = 0, only = []):
     mrr = []
     if only:
         queries = only #mirar solo las queries estas
@@ -324,7 +466,7 @@ def mean_reciprocal_rank(queries_real, index, idf, tf, title_index, k, only = []
     queries_sel = select_queries(queries, queries_real)
 
     for i, q in enumerate(queries_sel):
-        ranked_docs_t = search_tfidf(queries[i], index, idf, tf, title_index)
+        ranked_docs_t = search_tfidf(queries[i], index, idf, tf, title_index, log)
         rrt = reciprocal_rank(q, ranked_docs_t, k)
         mrr.append(rrt)
         # print(avgprecision_t)
@@ -333,7 +475,42 @@ def mean_reciprocal_rank(queries_real, index, idf, tf, title_index, k, only = []
         return sum(mrr)/len(mrr)
     return 0
 
-def NDCG():
-    # do nothing
+def NDCG(query_selected, ranked_docs, k):
+    relevant = {}
+    ideal_relevance = []
+    real_dcg = 0
+    ideal_dcg = 0
+    cap = len(ranked_docs)
+    
+
+    for r in range(min(k,cap)): # we suppose that if we want to rank a k larger than the ranked documents we still lose precision as we can't find more documents which means not relevant documents
+        query_row = query_selected[query_selected["pid"] == ranked_docs[r]]
+        l = query_row["labels"]
+        if not l.empty:
+            l = int(l.iloc[0])
+            if l > 0:
+                relevant[r+1] = l # posiciones: 1, 2, 3, 4, ....
+    if relevant:
+        i = 0
+        for position, relevance in relevant.items():
+            print(relevance)
+            i+=1 # i empieza en 1
+            real_dcg += ((2**relevance) - 1)/np.log2(1+position)
+            ideal_relevance.append(relevance)
+
+        ideal_relevance = sorted(ideal_relevance, reverse=True)
+        for i, rel in enumerate(ideal_relevance):
+            if rel > 0:
+                ideal_dcg += (2**rel - 1) / np.log2(i + 2) # i empieza en 0 aquí
+        return real_dcg/ideal_dcg
+    
     return 0
 
+            # print("Relevance: "+str(relevance))
+            # print("Relevance 2** : "+str(2**relevance))
+            # print("Relevance 2** -1 : "+str(2**relevance -1))
+            # print("#############")
+            # print("Position "+str(position)+ " i="+str(i))
+            # print("logp "+str(np.log2(1+position))+ " logi="+str(np.log2(1+i)))
+
+            # print("#############")
