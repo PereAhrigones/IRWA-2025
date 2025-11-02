@@ -21,7 +21,7 @@ class Document(BaseModel):
     average_rating: Optional[float] = None
     url: Optional[str] = None
     images: Optional[List[str]] = None # List of image URLs // Not needed for search
-    line: Optional[str] = None  # Combined field for search indexing // Not needed for search
+    line: Optional[str] = None  # Combined field for search indexing
 
     def to_json(self):
         return self.model_dump_json()
