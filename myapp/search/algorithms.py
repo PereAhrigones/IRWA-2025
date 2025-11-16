@@ -309,6 +309,51 @@ def rank_documents_log(terms, docs, index, idf, tf, title_index): # THIS VERSION
 
     return result_docs
 
+def rank_documents_bm25(terms, docs, index, idf, tf, title_index):
+    ''' 
+    Rank documents based on BM25 ranking function
+    Arguments:
+    terms -- list of processed query terms
+    docs -- list of document IDs to rank
+    index -- inverted index
+    idf -- inverse document frequencies
+    tf -- term frequencies
+    title_index -- mapping of document IDs to titles (not needed for ranking for now)
+    '''
+    k1 = 1.75
+    b = 0.75
+    avg_doc_len = sum(len(posting[1]) for postings in index.values() for posting in postings) / len(docs)
+
+    doc_scores = defaultdict(float)
+
+    for term in terms:
+        if term not in index:
+            continue
+
+        for doc_idx, posting in enumerate(index[term]):
+            try:
+                doc_id = posting[0]
+                term_freq = len(posting[1])
+            except Exception:
+                continue
+            if doc_id in docs:
+                idf_term = idf[term]
+                doc_len = sum(len(p[1]) for p in index[term] if p[0] == doc_id)
+                denom = term_freq + k1 * (1 - b + b * (doc_len / avg_doc_len))
+                score = idf_term * ((term_freq * (k1 + 1)) / denom)
+                doc_scores[doc_id] += score
+
+    ranked_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
+    result_docs = [doc for doc, score in ranked_docs]
+
+    if len(result_docs) == 0:  # no results found
+        print("No results found :(")
+        query = input()
+        docs = search_tfidf(query, index)
+
+    return result_docs
+
+
 def search_tfidf(query, index, idf, tf, title_index, log = 0):
     '''Search for documents using the TF-IDF model. Returns only documents that contain ALL query terms.'''
     query_terms = build_terms(query) # process query into terms
