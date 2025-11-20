@@ -357,6 +357,7 @@ def compute_doc_lengths(documents):
     return doc_lengths
 
 def search_bm25(query, index, df, idf, tf, title_index, doc_lengths, k1 = 1.2, b = 0.75):
+               #query, index, df, idf, tf, title_index, doc_lengths, k1, b
     '''Search for documents using the BM25 ranking function. Returns only documents that contain ALL query terms.'''
     query_terms = build_terms(query) # process query into terms
 
@@ -456,7 +457,7 @@ def search_appg25(query, index, idf, tf, title_index, doc_lengths, documents, k1
         return []
 
     docs = list(docs_intersection)
-    ranked_docs = rank_documents_appg25(query_terms, docs, index, idf, tf, title_index, doc_lengths, documents, k1, b) # rank documents
+    ranked_docs = rank_documents_appg25(query_terms, docs, index, idf, tf, title_index, doc_lengths, documents, k1, b, w_r, w_p) # rank documents
     return ranked_docs
 
 def rank_documents_appg25(terms, docs, index, idf, tf, title_index, doc_lengths, documents, k1, b, w_r = 0.5, w_p = 0.5):
@@ -487,7 +488,7 @@ def rank_documents_appg25(terms, docs, index, idf, tf, title_index, doc_lengths,
                 doc_vectors[doc_id][term_idx] = tf[term][doc_idx] * idf[term] # compute document vector component
 
     doc_scores = [[np.dot(curDocVec, query_vector), doc] for doc, curDocVec in doc_vectors.items()] # compute cosine similarity scores
-    product_scores = get_score([documents[doc] for doc in docs]) # get product scores
+    product_scores = get_score([documents[str(doc)] for doc in docs]) # get product scores
 
     for i in range(len(doc_scores)):
         pid = doc_scores[i][1]
@@ -505,7 +506,7 @@ def rank_documents_appg25(terms, docs, index, idf, tf, title_index, doc_lengths,
 
     return result_docs
 
-def search_search_fun(query, index, idf, tf, title_index, doc_lengths, documents, k1, b, w_r, w_p, search_fun):
+def search_search_fun(query, index, df, idf, tf, title_index, doc_lengths, documents, k1, b, w_r, w_p, search_fun):
     """
     Given a ranking function name as a string returns the ranked docs using that function
     Takes all ranking function arguments
@@ -513,7 +514,7 @@ def search_search_fun(query, index, idf, tf, title_index, doc_lengths, documents
     if search_fun == "search_tfidf":
         return search_tfidf(query, index, idf, tf, title_index)
     elif search_fun == "search_bm25":
-        return search_bm25(query, index, idf, tf, title_index, doc_lengths, k1, b)
+        return search_bm25(query, index, df, idf, tf, title_index, doc_lengths, k1, b)
     elif search_fun == "custom":
         return search_appg25(query, index, idf, tf, title_index, doc_lengths, documents, k1, b, w_r, w_p)
     return search_appg25(query, index, idf, tf, title_index, doc_lengths, documents, k1, b, w_r, w_p) #default our ranking for ease
@@ -679,8 +680,9 @@ def f1_score_at_K_optimized(query_selected, ranked_docs, k): # optimized version
 
     return 0
 
+
                            ########################### PARAMETERS FOR SEARCHING FUNCTIONS ###########################   ####### EVALUATING FUNCTIONS PARAMETERS #######
-def mean_average_precision(queries_real, queries_test, index, idf, tf, title_index, df = [], doc_lengths = [], k1 = 1.2, b = 0.75, log = 0, only_id = [], search_fun = "search_tfidf"):
+def mean_average_precision(queries_real, queries_test, index, idf, tf, title_index, df = [], doc_lengths = [], documents = {}, k1 = 1.2, b = 0.75, w_r =0.5, w_p = 0.5, log = 0, only_id = [], search_fun = "search_tfidf"):
     """
     query_real: dataframe with all the queries and their labels
     queries_test: list of the queries we want to evaluate
@@ -710,7 +712,7 @@ def mean_average_precision(queries_real, queries_test, index, idf, tf, title_ind
     queries_sel = select_queries(queries, queries_real) # select the queries from the dataframe
 
     for i, q in enumerate(queries_sel): # for each selected query
-        ranked_docs_t = search_search_fun(queries[i], index, df, idf, tf, title_index, doc_lengths, k1, b, search_fun) # search for ranked documents
+        ranked_docs_t = search_search_fun(queries[i], index, df, idf, tf, title_index, doc_lengths, documents, k1, b, w_r, w_p, search_fun) # search for ranked documents
         avgprecision_t = average_precision(q, ranked_docs_t) # compute average precision
         map_map.append(avgprecision_t) # append to list
         # print(avgprecision_t)
@@ -745,7 +747,7 @@ def reciprocal_rank(query_sel, ranked_docs, k):
 
 
                          ########################### PARAMETERS FOR SEARCHING FUNCTIONS ###########################   ####### EVALUATING FUNCTIONS PARAMETERS #######
-def mean_reciprocal_rank(queries_real, queries_test, index, idf, tf, title_index, k, df = [], doc_lengths = [], k1 = 1.2, b = 0.75, log = 0, only_id = [], search_fun = "search_tfidf"):
+def mean_reciprocal_rank(queries_real, queries_test, index, idf, tf, title_index, k, df = [], doc_lengths = [], documents = {}, k1 = 1.2, b = 0.75, w_r =0.5, w_p = 0.5, log = 0, only_id = [], search_fun = "search_tfidf"):
     """
     query_real: dataframe with all the queries and their labels
     queries_test: list of the queries we want to evaluate
@@ -775,7 +777,7 @@ def mean_reciprocal_rank(queries_real, queries_test, index, idf, tf, title_index
     queries_sel = select_queries(queries, queries_real)
 
     for i, q in enumerate(queries_sel):
-        ranked_docs_t = search_search_fun(queries[i], index, df, idf, tf, title_index, doc_lengths, k1, b, search_fun)
+        ranked_docs_t = search_search_fun(queries[i], index, df, idf, tf, title_index, doc_lengths, documents, k1, b, w_r, w_p, search_fun)
         rrt = reciprocal_rank(q, ranked_docs_t, k)
         mrr.append(rrt)
         # print(avgprecision_t)
