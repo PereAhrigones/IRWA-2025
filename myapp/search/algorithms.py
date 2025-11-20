@@ -427,7 +427,7 @@ def rank_documents_bm25(terms, docs, index, idf, tf, title_index, doc_lengths, k
 
     return result_docs
 
-def search_appg25(query, index, idf, tf, title_index, doc_lengths, k1 = 1.2, b = 0.75):
+def search_appg25(query, index, idf, tf, title_index, doc_lengths, documents, k1 = 1.2, b = 0.75):
     '''Search for documents using the BM25 ranking function. Returns only documents that contain ALL query terms.'''
     query_terms = build_terms(query) # process query into terms
 
@@ -448,18 +448,56 @@ def search_appg25(query, index, idf, tf, title_index, doc_lengths, k1 = 1.2, b =
         return []
 
     docs = list(docs_intersection)
-    ranked_docs = rank_documents_appg25(query_terms, docs, index, idf, tf, title_index, doc_lengths, k1, b) # rank documents
+    ranked_docs = rank_documents_appg25(query_terms, docs, index, idf, tf, title_index, doc_lengths, documents, k1, b) # rank documents
     return ranked_docs
 
-def rank_documents_appg25(query, index, idf, tf, title_index, doc_lengths, k1, b):
+def rank_documents_appg25(terms, docs, index, idf, tf, title_index, doc_lengths, documents, k1, b, w_r = 0.5, w_p = 0.5):
     """
     Our ranking function
     """
+    #Basically tfidf with product score
     ########### TO DO #############
-    ranked_docs = []
-    return ranked_docs
+    doc_vectors = defaultdict(lambda: [0] * len(terms)) # document vectors initialized to zero
+    query_vector = [0] * len(terms) # query vector initialized to zero
 
-def search_search_fun(query, index, idf, tf, title_index, doc_lengths, k1, b, search_fun):
+    query_terms_count = collections.Counter(terms)  # term frequency in query
+
+    query_norm = la.norm(list(query_terms_count.values())) # norm of query vector
+
+    for term_idx, term in enumerate(terms): # iterate over query terms
+        if term not in index: # term not in corpus
+            continue
+
+        query_vector[term_idx] = (query_terms_count[term] / query_norm) * idf[term] # compute query vector component
+
+        for doc_idx, posting in enumerate(index[term]): # iterate over postings for the term
+            try:
+                doc_id = posting[0] # get document ID
+            except Exception:
+                continue
+            if doc_id in docs:
+                doc_vectors[doc_id][term_idx] = tf[term][doc_idx] * idf[term] # compute document vector component
+
+    doc_scores = [[np.dot(curDocVec, query_vector), doc] for doc, curDocVec in doc_vectors.items()] # compute cosine similarity scores
+    product_scores = get_score([documents[doc] for doc in docs]) # get product scores
+
+    for i in range(len(doc_scores)):
+        pid = doc_scores[i][1]
+        if pid in product_scores:
+            doc_scores[i][0] = w_r * doc_scores[i][0] + w_p * product_scores[pid]
+        else:
+            doc_scores[i][0] = w_r * doc_scores[i][0]
+    
+    doc_scores.sort(reverse=True) # sort documents by score
+    result_docs = [x[1] for x in doc_scores] # extract sorted document
+    if len(result_docs) == 0:  # no results found
+        print("No results found :(")
+        query = input()
+        docs = search_tfidf(query, index)
+
+    return result_docs
+
+def search_search_fun(query, index, idf, tf, title_index, doc_lengths, documents, k1, b, w_r, w_p, search_fun):
     """
     Given a ranking function name as a string returns the ranked docs using that function
     Takes all ranking function arguments
@@ -468,8 +506,43 @@ def search_search_fun(query, index, idf, tf, title_index, doc_lengths, k1, b, se
         return search_tfidf(query, index, idf, tf, title_index)
     elif search_fun == "search_bm25":
         return search_bm25(query, index, idf, tf, title_index, doc_lengths, k1, b)
-    return search_appg25(query, index, idf, tf, title_index, doc_lengths, k1, b)
+    elif search_fun == "custom":
+        return search_appg25(query, index, idf, tf, title_index, doc_lengths, documents, k1, b, w_r, w_p)
+    return search_appg25(query, index, idf, tf, title_index, doc_lengths, documents, k1, b, w_r, w_p) #default our ranking for ease
 
+def get_score(documents, w_rating = 0.5, w_price = 0.5):
+    """
+    Given a list of documents, compute min and max price and score for each document
+    """
+    prices = [doc.selling_price for doc in documents]
+    min_price = min(prices)
+    max_price = max(prices)
+
+    scores = {}
+    for doc in documents:
+        score = score_product(doc, min_price, max_price, w_rating, w_price)
+        scores[doc.pid] = score
+    return scores
+
+def score_product(document, min_price, max_price, w_rating = 0.5, w_price = 0.5):
+    """
+    Given a document, compute its score based on rating and price
+    """
+    rating = document.average_rating
+    price = document.selling_price
+
+    # Normalize rating
+    norm_rating = rating / 5.0
+
+    # Normalize price
+    if max_price == min_price:
+        norm_price = 1.0
+    else:
+        norm_price = (max_price - price) / (max_price - min_price)
+
+    # Compute final score
+    score = (w_rating * norm_rating) + (w_price * norm_price)
+    return score
 ###### PART 2 ALGORITHMS #####
 
 def select_queries(queries, all_queries): # select only the queries in the dataframe
@@ -742,3 +815,4 @@ def NDCG(query_selected, ranked_docs, k):
             # print("logp "+str(np.log2(1+position))+ " logi="+str(np.log2(1+i)))
 
             # print("#############")
+
