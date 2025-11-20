@@ -435,7 +435,7 @@ def rank_documents_bm25(terms, docs, index, df, idf, tf, title_index, doc_length
 
     return result_docs
 
-def search_appg25(query, index, idf, tf, title_index, doc_lengths, documents, k1 = 1.2, b = 0.75):
+def search_appg25(query, index, idf, tf, title_index, doc_lengths, documents, k1 = 1.2, b = 0.75, w_r = 0.5, w_p = 0.5):
     '''Search for documents using the BM25 ranking function. Returns only documents that contain ALL query terms.'''
     query_terms = build_terms(query) # process query into terms
 
@@ -492,16 +492,16 @@ def rank_documents_appg25(terms, docs, index, idf, tf, title_index, doc_lengths,
     for i in range(len(doc_scores)):
         pid = doc_scores[i][1]
         if pid in product_scores:
-            doc_scores[i][0] = w_r * doc_scores[i][0] + w_p * product_scores[pid]
+            doc_scores[i][0] = k1 * doc_scores[i][0] + b * product_scores[pid]
         else:
-            doc_scores[i][0] = w_r * doc_scores[i][0]
+            doc_scores[i][0] = k1 * doc_scores[i][0]
     
     doc_scores.sort(reverse=True) # sort documents by score
     result_docs = [x[1] for x in doc_scores] # extract sorted document
     if len(result_docs) == 0:  # no results found
         print("No results found :(")
         query = input()
-        docs = search_tfidf(query, index)
+        docs = search_appg25(query, index, idf, tf, title_index, doc_lengths, documents, k1, b, w_r, w_p)
 
     return result_docs
 
@@ -536,8 +536,15 @@ def score_product(document, min_price, max_price, w_rating = 0.5, w_price = 0.5)
     """
     Given a document, compute its score based on rating and price
     """
-    rating = document.average_rating
-    price = document.selling_price
+    try:
+        rating = float(document.average_rating)
+    except (TypeError, ValueError):
+        rating = 0.0
+
+    try:
+        price = float(document.selling_price)
+    except (TypeError, ValueError):
+        price = max_price
 
     # Normalize rating
     norm_rating = rating / 5.0
@@ -546,11 +553,10 @@ def score_product(document, min_price, max_price, w_rating = 0.5, w_price = 0.5)
     if max_price == min_price:
         norm_price = 1.0
     else:
-        norm_price = (max_price - price) / (max_price - min_price)
+        norm_price = 1 - (price - min_price) / (max_price - min_price)
 
-    # Compute final score
-    score = (w_rating * norm_rating) + (w_price * norm_price)
-    return score
+    # Score final
+    return (w_rating * norm_rating) + (w_price * norm_price)
 ###### PART 2 ALGORITHMS #####
 
 def select_queries(queries, all_queries): # select only the queries in the dataframe
