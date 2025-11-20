@@ -203,7 +203,7 @@ def compute_line_docs(documents):
         doc.line = build_terms(combined_text) # Process combined text into terms
     return documents
 
-def rank_documents(terms, docs, index, idf, tf, title_index):
+def rank_documents(terms, docs, index, idf, tf, title_index): # THIS VERSION USES COSINE-SIMILARITY WITH TF-IDF
     ''' 
     Rank documents based on cosine similarity between query and document vectors using TF-IDF weights
     Arguments:
@@ -309,51 +309,6 @@ def rank_documents_log(terms, docs, index, idf, tf, title_index): # THIS VERSION
 
     return result_docs
 
-def rank_documents_bm25(terms, docs, index, idf, tf, title_index):
-    ''' 
-    Rank documents based on BM25 ranking function
-    Arguments:
-    terms -- list of processed query terms
-    docs -- list of document IDs to rank
-    index -- inverted index
-    idf -- inverse document frequencies
-    tf -- term frequencies
-    title_index -- mapping of document IDs to titles (not needed for ranking for now)
-    '''
-    k1 = 1.75
-    b = 0.75
-    avg_doc_len = sum(len(posting[1]) for postings in index.values() for posting in postings) / len(docs)
-
-    doc_scores = defaultdict(float)
-
-    for term in terms:
-        if term not in index:
-            continue
-
-        for doc_idx, posting in enumerate(index[term]):
-            try:
-                doc_id = posting[0]
-                term_freq = len(posting[1])
-            except Exception:
-                continue
-            if doc_id in docs:
-                idf_term = idf[term]
-                doc_len = sum(len(p[1]) for p in index[term] if p[0] == doc_id)
-                denom = term_freq + k1 * (1 - b + b * (doc_len / avg_doc_len))
-                score = idf_term * ((term_freq * (k1 + 1)) / denom)
-                doc_scores[doc_id] += score
-
-    ranked_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
-    result_docs = [doc for doc, score in ranked_docs]
-
-    if len(result_docs) == 0:  # no results found
-        print("No results found :(")
-        query = input()
-        docs = search_tfidf(query, index)
-
-    return result_docs
-
-
 def search_tfidf(query, index, idf, tf, title_index, log = 0):
     '''Search for documents using the TF-IDF model. Returns only documents that contain ALL query terms.'''
     query_terms = build_terms(query) # process query into terms
@@ -381,6 +336,139 @@ def search_tfidf(query, index, idf, tf, title_index, log = 0):
         ranked_docs = rank_documents(query_terms, docs, index, idf, tf, title_index) # rank documents
     return ranked_docs
 
+###### PART 3 ALGORITHMS #####
+
+def compute_doc_lengths(documents):
+    '''
+    Function to compute the lengths of documents in the corpus
+    Argument:
+    documents -- dictionary of Document objects (the corpus)
+    num_documents -- total number of documents
+    Returns:
+    doc_lengths -- dictionary mapping document IDs to their lengths
+    '''
+    doc_lengths = {}
+    for doc_id, doc in documents.items():
+        terms = doc.line
+        length = len(terms)
+        doc_lengths[str(doc_id)] = length # key are string document IDs
+    return doc_lengths
+
+def search_bm25(query, index, idf, tf, title_index, doc_lengths, k1 = 1.2, b = 0.75):
+    '''Search for documents using the BM25 ranking function. Returns only documents that contain ALL query terms.'''
+    query_terms = build_terms(query) # process query into terms
+
+    if not query_terms: # If no query terms, return empty list
+        return []
+
+    docs_intersection = None
+    for term in query_terms: # if term not in index, no document contains it -> no results
+        if term not in index:
+            return []
+        term_docs = {posting[0] for posting in index[term]}
+        if docs_intersection is None:
+            docs_intersection = term_docs
+        else:
+            docs_intersection &= term_docs
+
+    if not docs_intersection:
+        return []
+
+    docs = list(docs_intersection)
+    ranked_docs = rank_documents_bm25(query_terms, docs, index, idf, tf, title_index, doc_lengths, k1, b) # rank documents
+    return ranked_docs
+
+def rank_documents_bm25(terms, docs, index, idf, tf, title_index, doc_lengths, k1, b):
+    ''' 
+    Rank documents based on BM25 ranking function
+    Arguments:
+    terms -- list of processed query terms
+    docs -- list of document IDs to rank
+    index -- inverted index
+    idf -- inverse document frequencies
+    tf -- term frequencies
+    title_index -- mapping of document IDs to titles (not needed for ranking for now)
+    '''
+    
+    
+    #avg_doc_len = sum(len(posting[1]) for postings in index.values() for posting in postings) / len(docs)
+    total_length = sum(doc_lengths[doc_id] for doc_id in docs)
+    avg_doc_len = total_length / len(docs)
+
+    doc_scores = defaultdict(float)
+
+    for term in terms:
+        if term not in index:
+            continue
+
+        for doc_idx, posting in enumerate(index[term]):
+            try:
+                doc_id = posting[0]
+                term_freq = len(posting[1]) # posting ==> [doc_id, [list of positions of term in doc]]
+                # alternative: term_freq = tf[term][doc_idx]
+
+            except Exception:
+                continue
+
+            if doc_id in docs:
+                idf_term = idf[term]
+                # doc_len = sum(len(p[1]) for p in index[term] if p[0] == doc_id) # total terms in the document
+                denom = term_freq + k1 * (1 - b + b * (doc_lengths[doc_id] / avg_doc_len))
+                score = idf_term * ((term_freq * (k1 + 1)) / denom)
+                doc_scores[doc_id] += score
+
+    ranked_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
+    result_docs = [doc for doc, score in ranked_docs]
+
+    if len(result_docs) == 0:  # no results found
+        print("No results found :(")
+        query = input()
+        docs = search_tfidf(query, index)
+
+    return result_docs
+
+def search_appg25(query, index, idf, tf, title_index, doc_lengths, k1 = 1.2, b = 0.75):
+    '''Search for documents using the BM25 ranking function. Returns only documents that contain ALL query terms.'''
+    query_terms = build_terms(query) # process query into terms
+
+    if not query_terms: # If no query terms, return empty list
+        return []
+
+    docs_intersection = None
+    for term in query_terms: # if term not in index, no document contains it -> no results
+        if term not in index:
+            return []
+        term_docs = {posting[0] for posting in index[term]}
+        if docs_intersection is None:
+            docs_intersection = term_docs
+        else:
+            docs_intersection &= term_docs
+
+    if not docs_intersection:
+        return []
+
+    docs = list(docs_intersection)
+    ranked_docs = rank_documents_appg25(query_terms, docs, index, idf, tf, title_index, doc_lengths, k1, b) # rank documents
+    return ranked_docs
+
+def rank_documents_appg25(query, index, idf, tf, title_index, doc_lengths, k1, b):
+    """
+    Our ranking function
+    """
+    ########### TO DO #############
+    ranked_docs = []
+    return ranked_docs
+
+def search_search_fun(query, index, idf, tf, title_index, doc_lengths, k1, b, search_fun):
+    """
+    Given a ranking function name as a string returns the ranked docs using that function
+    Takes all ranking function arguments
+    """
+    if search_fun == "search_tfidf":
+        return search_tfidf(query, index, idf, tf, title_index)
+    elif search_fun == "search_bm25":
+        return search_bm25(query, index, idf, tf, title_index, doc_lengths, k1, b)
+    return search_appg25(query, index, idf, tf, title_index, doc_lengths, k1, b)
 
 ###### PART 2 ALGORITHMS #####
 
@@ -504,15 +592,21 @@ def f1_score_at_K_optimized(query_selected, ranked_docs, k): # optimized version
 
     return 0
 
-def mean_average_precision(queries_real, queries_test, index, idf, tf, title_index, log = 0, only_id = []):
+                           ########################### PARAMETERS FOR SEARCHING FUNCTIONS ###########################   ####### EVALUATING FUNCTIONS PARAMETERS #######
+def mean_average_precision(queries_real, queries_test, index, idf, tf, title_index, doc_lengths = [], k1 = 1.2, b = 0.75, log = 0, only_id = [], search_fun = "search_tfidf"):
     """
     query_real: dataframe with all the queries and their labels
+    queries_test: list of the queries we want to evaluate
     index: inverted index
     idf: inverse document frequency
     tf: term frequency
     title_index: title index
+    doc_lengths: dictionary with all document's lenght based on its str(doc_id)
+    k1: parameter of BM25
+    b: parameter of BM25
     log: int (1 for log functions, 0 for normal)
     only_id: list of queries to consider instead of all
+    search_fun: ranking_function we want to evaluate
     returns: mean average precision
     """
     map_map = [] # list of average precisions
@@ -529,7 +623,7 @@ def mean_average_precision(queries_real, queries_test, index, idf, tf, title_ind
     queries_sel = select_queries(queries, queries_real) # select the queries from the dataframe
 
     for i, q in enumerate(queries_sel): # for each selected query
-        ranked_docs_t = search_tfidf(queries[i], index, idf, tf, title_index, log) # search for ranked documents
+        ranked_docs_t = search_search_fun(queries[i], index, idf, tf, title_index, doc_lengths, k1, b, search_fun) # search for ranked documents
         avgprecision_t = average_precision(q, ranked_docs_t) # compute average precision
         map_map.append(avgprecision_t) # append to list
         # print(avgprecision_t)
@@ -560,19 +654,24 @@ def reciprocal_rank(query_sel, ranked_docs, k):
                 if relevant>0:
                     return(1/(r+1)) # first relevant document found
     
-    return 1 / (r + 1)
+    return 0
 
 
-def mean_reciprocal_rank(queries_real, queries_test, index, idf, tf, title_index, k, log = 0, only_id = []):
+                         ########################### PARAMETERS FOR SEARCHING FUNCTIONS ###########################   ####### EVALUATING FUNCTIONS PARAMETERS #######
+def mean_reciprocal_rank(queries_real, queries_test, index, idf, tf, title_index, k, doc_lengths = [], k1 = 1.2, b = 0.75, log = 0, only_id = [], search_fun = "search_tfidf"):
     """
-    queries_real: dataframe with all the queries and their labels
-    queries_test: list of query texts
+    query_real: dataframe with all the queries and their labels
+    queries_test: list of the queries we want to evaluate
     index: inverted index
     idf: inverse document frequency
     tf: term frequency
     title_index: title index
+    doc_lengths: dictionary with all document's lenght based on its str(doc_id)
+    k1: parameter of BM25
+    b: parameter of BM25
     log: int (1 for log functions, 0 for normal)
     only_id: list of queries to consider instead of all
+    search_fun: ranking_function we want to evaluate
     returns: mean reciprocal rank
     """
     mrr = []
@@ -589,13 +688,13 @@ def mean_reciprocal_rank(queries_real, queries_test, index, idf, tf, title_index
     queries_sel = select_queries(queries, queries_real)
 
     for i, q in enumerate(queries_sel):
-        ranked_docs_t = search_tfidf(queries[i], index, idf, tf, title_index, log)
+        ranked_docs_t = search_search_fun(queries[i], index, idf, tf, title_index, doc_lengths, k1, b, search_fun)
         rrt = reciprocal_rank(q, ranked_docs_t, k)
         mrr.append(rrt)
         # print(avgprecision_t)
     
     if mrr:
-        return sum(mrr)/len(mrr) # mean reciprocal rank (all same logic as mean average precision)
+        return sum(mrr)/len(queries_sel) # mean reciprocal rank (all same logic as mean average precision)
     return 0
 
 def NDCG(query_selected, ranked_docs, k):
