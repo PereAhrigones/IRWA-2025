@@ -32,7 +32,10 @@ def build_terms(field):
     stemmer = PorterStemmer()
     stop_words = set(stopwords.words('english'))
     line = field.lower() # Lowercase
-    line = re.sub(r'([.,])([^\s])', r'\1 \2', line)  # Add space after punctuation if missing
+    # Ensure there's a space before and after punctuation so punctuation becomes separate tokens
+    line = re.sub(r"\s*([.,;:!?])\s*", r" \1 ", line)
+    # Collapse multiple spaces created by the substitution
+    line = re.sub(r"\s+", " ", line).strip()
     line = line.split() # Tokenize
     line = [word for word in line if word not in stop_words] # Remove stopwords
     line = [stemmer.stem(word) for word in line] # Stemming
