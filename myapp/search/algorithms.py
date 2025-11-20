@@ -8,6 +8,7 @@ import numpy as np
 
 from array import array
 import math
+from numpy.linalg import norm
 
 
 
@@ -38,6 +39,7 @@ def build_terms(field):
     line = re.sub(r"\s+", " ", line).strip()
     line = line.split() # Tokenize
     line = [word for word in line if word not in stop_words] # Remove stopwords
+    line = [word for word in line if word.isalnum()] # Remove standalone punctuation tokens
     line = [stemmer.stem(word) for word in line] # Stemming
     return line
 
@@ -359,6 +361,7 @@ def compute_doc_lengths(documents):
         doc_lengths[str(doc_id)] = length # key are string document IDs
     return doc_lengths
 
+#              RANKING FUNCTIONS
 def search_bm25(query, index, df, idf, tf, title_index, doc_lengths, k1 = 1.2, b = 0.75):
                #query, index, df, idf, tf, title_index, doc_lengths, k1, b
     '''Search for documents using the BM25 ranking function. Returns only documents that contain ALL query terms.'''
@@ -561,6 +564,62 @@ def score_product(document, min_price, max_price, w_rating = 0.5, w_price = 0.5)
 
     # Score final
     return (w_rating * norm_rating) + (w_price * norm_price)
+
+def expand_query(query, w2v_model, topn=10): # NOT NEEDED
+
+    query = build_terms(query)
+    expanded_query = [t for t in query] # initialize with original query. Note, it is a list
+
+    # extend each single term of the original query and append to expanded query
+    for t in query:
+        expanded_query.extend(s for s, f in w2v_model.wv.most_similar(t, topn=topn))
+
+    return expanded_query
+
+import numpy as np
+
+def search_word2vec(query, doc_vectors, w2v_model, top=20):
+    query_vec = build_query_vector(query, w2v_model)
+
+    scores = []
+    for pid, doc_vec in doc_vectors.items():
+        if norm(query_vec) == 0 or norm(doc_vec) == 0:
+            score = 0
+        else:
+            score = np.dot(query_vec, doc_vec)/(norm(query_vec)*norm(doc_vec))
+        
+        scores.append((pid, score))
+
+    scores.sort(key=lambda x: x[1], reverse=True)
+    return [pid for pid, score in scores[:top]]
+
+def build_document_vectors(docs, w2v_model):
+
+    doc_vec = {}
+
+    for pid, doc in docs.items():
+        words = [word for word in doc.line if word in w2v_model.wv]
+        
+        if not words: # if there are no words in the vocabulary
+            doc_vec[pid] = np.zeros(w2v_model.vector_size)
+            continue
+        vecs = np.array([w2v_model.wv[word] for word in words])
+        doc_vec[pid] = np.mean(vecs, axis=0)
+
+    return doc_vec
+
+def build_query_vector(query, w2v_model):
+    words = build_terms(query)
+    words = [word for word in words if word in w2v_model.wv]
+
+    if not words:
+        return np.zeros(w2v_model.vector_size)
+
+    query_vec = np.array([w2v_model.wv[w] for w in words])
+    return np.mean(query_vec, axis=0)
+
+
+
 ###### PART 2 ALGORITHMS #####
 
 def select_queries(queries, all_queries): # select only the queries in the dataframe
