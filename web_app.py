@@ -1,5 +1,7 @@
 import os
 from json import JSONEncoder
+import time
+import numpy as np
 
 import httpagentparser  # for getting the user agent as json
 from flask import Flask, render_template, session
@@ -44,6 +46,19 @@ corpus = load_corpus(file_path)
 # Log first element of corpus to verify it loaded correctly:
 print("\nCorpus is loaded... \n First element:\n", list(corpus.values())[0])
 
+#Esto es temporal. Hay que guardar lo que se va a cargar aquí en algun archivo y cargar ese archivo al inciar la app.
+from myapp.search.algorithms import compute_line_docs
+start_time = time.time()
+corpus = compute_line_docs(corpus)
+from myapp.search.algorithms import compute_doc_lengths
+doc_lengths = compute_doc_lengths(corpus)
+print("Total time to preprocess documents: {} seconds" .format(np.round(time.time() - start_time, 2)))
+start_time = time.time()
+num_documents = len(corpus)
+from myapp.search.algorithms import create_index_tfidf
+inv_index, tf, df, idf, title_index, other = create_index_tfidf(corpus, num_documents)
+print("Total time to create the index: {} seconds" .format(np.round(time.time() - start_time, 2)))
+
 
 # Home URL "/"
 @app.route('/')
@@ -74,7 +89,7 @@ def search_form_post():
 
     search_id = analytics_data.save_query_terms(search_query)
 
-    results = search_engine.search(search_query, search_id, corpus)
+    results = search_engine.search(search_query, search_id, corpus, inv_index, idf, tf, title_index, doc_lengths)
 
     # generate RAG response based on user query and retrieved results
     rag_response = rag_generator.generate_response(search_query, results)

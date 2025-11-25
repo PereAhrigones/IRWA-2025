@@ -2,6 +2,7 @@ import random
 import numpy as np
 
 from myapp.search.objects import Document
+from myapp.search.algorithms import search_appg25
 
 
 def dummy_search(corpus: dict, search_id, num_results=20):
@@ -25,12 +26,19 @@ def dummy_search(corpus: dict, search_id, num_results=20):
 class SearchEngine:
     """Class that implements the search engine logic"""
 
-    def search(self, search_query, search_id, corpus):
+    def search(self, search_query, search_id, corpus, index, idf, tf, title_index, doc_lengths):
         print("Search query:", search_query)
 
         results = []
         ### You should implement your search logic here:
-        results = dummy_search(corpus, search_id)  # replace with call to search algorithm
+        best_results = search_appg25(search_query, index, idf, tf, title_index, doc_lengths, corpus)  # replace with call to search algorithm
 
+        top = 20 # Esto es provisional para que solo se quede con los 20 mejores resultados
+        best_results = best_results[:top]
+
+        for doc_id in best_results:
+            doc = corpus[doc_id]
+            results.append(Document(pid=doc.pid, title=doc.title, description=doc.description,
+                                    url="doc_details?pid={}&search_id={}&param2=2".format(doc.pid, search_id), ranking=random.random()))
         # results = search_in_corpus(search_query)
         return results
