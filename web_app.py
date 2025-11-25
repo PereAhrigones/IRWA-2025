@@ -47,18 +47,15 @@ corpus = load_corpus(file_path)
 print("\nCorpus is loaded... \n First element:\n", list(corpus.values())[0])
 
 #Esto es temporal. Hay que guardar lo que se va a cargar aquí en algun archivo y cargar ese archivo al inciar la app.
-from myapp.search.algorithms import compute_line_docs
-start_time = time.time()
-corpus = compute_line_docs(corpus)
-from myapp.search.algorithms import compute_doc_lengths
-doc_lengths = compute_doc_lengths(corpus)
-print("Total time to preprocess documents: {} seconds" .format(np.round(time.time() - start_time, 2)))
-start_time = time.time()
-num_documents = len(corpus)
-from myapp.search.algorithms import create_index_tfidf
-inv_index, tf, df, idf, title_index, other = create_index_tfidf(corpus, num_documents)
-print("Total time to create the index: {} seconds" .format(np.round(time.time() - start_time, 2)))
 
+start_time = time.time()
+import gzip, pickle
+from pathlib import Path
+doc_lengths = len(corpus)
+final_path = Path("data/index_snapshot.pkl.gz")
+with gzip.open(final_path, "rb") as f:
+    inv_index, tf, df, idf, title_index = pickle.load(f)
+print("Total time to load the index: {} seconds" .format(np.round(time.time() - start_time, 2)))
 
 # Home URL "/"
 @app.route('/')
