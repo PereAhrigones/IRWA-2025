@@ -33,12 +33,10 @@ class SearchEngine:
         ### You should implement your search logic here:
         best_results = search_appg25(search_query, index, idf, tf, title_index, doc_lengths, corpus)  # replace with call to search algorithm
 
-        top = 20 # Esto es provisional para que solo se quede con los 20 mejores resultados
-        best_results = best_results[:top]
-
+        # Return all ranked results; pagination will be handled by the web layer
         for doc_id in best_results:
             doc = corpus[doc_id]
-            results.append(Document(pid=doc.pid, title=doc.title, description=doc.description,
+            results.append(Document(pid=doc.pid, title=doc.title, description=doc.description, actual_price=doc.actual_price,
                                     url="doc_details?pid={}&search_id={}&param2=2".format(doc.pid, search_id), ranking=random.random()))
         # results = search_in_corpus(search_query)
         return results

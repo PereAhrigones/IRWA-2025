@@ -21,14 +21,28 @@ class AnalyticsData:
     
     def plot_number_of_views(self):
         # Prepare data
+        # If there are no clicks yet, return a simple HTML message instead of building a chart
+        if not self.fact_clicks:
+                return """
+                <html>
+                    <head><meta charset="utf-8"><title>No data</title></head>
+                    <body style="font-family: Arial, sans-serif; color: #333;">
+                        <div style="padding:20px; text-align:center;">
+                            <h3>No analytics data available yet</h3>
+                            <p>There are no document clicks recorded so far. The dashboard will show charts here once there is data.</p>
+                        </div>
+                    </body>
+                </html>
+                """
+
         data = [{'Document ID': doc_id, 'Number of Views': count} for doc_id, count in self.fact_clicks.items()]
         df = pd.DataFrame(data)
         # Create Altair chart
         chart = alt.Chart(df).mark_bar().encode(
-            x='Document ID',
-            y='Number of Views'
+                x='Document ID',
+                y='Number of Views'
         ).properties(
-            title='Number of Views per Document'
+                title='Number of Views per Document'
         )
         # Render the chart to HTML
         return chart.to_html()

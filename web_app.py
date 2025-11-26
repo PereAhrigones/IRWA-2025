@@ -98,19 +98,36 @@ def results():
     if not search_query:
         # nothing to show, redirect to home
         return redirect(url_for('index'))
-
+    # compute full ranked results
     results = search_engine.search(search_query, search_id, corpus, inv_index, idf, tf, title_index, doc_lengths)
+
+    # pagination parameters (page from query string)
+    try:
+        page = int(request.args.get('page', 1))
+    except Exception:
+        page = 1
+    per_page = 20
+    total_results = len(results)
+    total_pages = max(1, int(np.ceil(total_results / per_page)))
+    # clamp page
+    if page < 1:
+        page = 1
+    if page > total_pages:
+        page = total_pages
+
+    start = (page - 1) * per_page
+    end = start + per_page
+    page_results = results[start:end]
 
     # generate RAG response based on user query and retrieved results
     rag_response = rag_generator.generate_response(search_query, results)
     print("RAG response:", rag_response)
 
-    found_count = len(results)
-    session['last_found_count'] = found_count
+    session['last_found_count'] = total_results
 
     print(session)
 
-    return render_template('results.html', results_list=results, page_title="Results", found_counter=found_count, rag_response=rag_response)
+    return render_template('results.html', results_list=page_results, page_title="Results", found_counter=total_results, rag_response=rag_response, page=page, total_pages=total_pages)
 
 
 @app.route('/doc_details', methods=['GET'])
