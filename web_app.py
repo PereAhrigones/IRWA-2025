@@ -4,7 +4,7 @@ import time
 import numpy as np
 
 import httpagentparser  # for getting the user agent as json
-from flask import Flask, render_template, session
+from flask import Flask, render_template, session, redirect, url_for
 from flask import request
 
 from myapp.analytics.analytics_data import AnalyticsData, ClickedDoc
@@ -46,8 +46,8 @@ corpus = load_corpus(file_path)
 # Log first element of corpus to verify it loaded correctly:
 print("\nCorpus is loaded... \n First element:\n", list(corpus.values())[0])
 
-#Esto es temporal. Hay que guardar lo que se va a cargar aquí en algun archivo y cargar ese archivo al inciar la app.
 
+#Load of the inverted index and related data structures
 start_time = time.time()
 import gzip, pickle
 from pathlib import Path
@@ -85,6 +85,19 @@ def search_form_post():
     session['last_search_query'] = search_query
 
     search_id = analytics_data.save_query_terms(search_query)
+    # Use Post-Redirect-Get pattern: store search info in session and redirect to GET results route
+    session['last_search_id'] = search_id
+    return redirect(url_for('results'))
+
+
+@app.route('/results', methods=['GET'])
+def results():
+    # Render search results on GET to avoid browser POST resubmission when navigating back
+    search_query = session.get('last_search_query')
+    search_id = session.get('last_search_id')
+    if not search_query:
+        # nothing to show, redirect to home
+        return redirect(url_for('index'))
 
     results = search_engine.search(search_query, search_id, corpus, inv_index, idf, tf, title_index, doc_lengths)
 
