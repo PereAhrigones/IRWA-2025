@@ -146,18 +146,25 @@ def doc_details():
     print("recovered var from session:", res)
 
     # get the query string parameters from request
-    clicked_doc_id = request.args["pid"]
+    clicked_doc_id = request.args.get("pid")
     print("click in id={}".format(clicked_doc_id))
 
+    # retrieve document from corpus if available
+    doc = None
+    if clicked_doc_id and clicked_doc_id in corpus:
+        doc = corpus[clicked_doc_id]
+    else:
+        print(f"Document id {clicked_doc_id} not found in corpus")
+
     # store data in statistics table 1
-    if clicked_doc_id in analytics_data.fact_clicks.keys():
+    if clicked_doc_id in analytics_data.fact_clicks.keys(): 
         analytics_data.fact_clicks[clicked_doc_id] += 1
     else:
         analytics_data.fact_clicks[clicked_doc_id] = 1
 
     print("fact_clicks count for id={} is {}".format(clicked_doc_id, analytics_data.fact_clicks[clicked_doc_id]))
     print(analytics_data.fact_clicks)
-    return render_template('doc_details.html')
+    return render_template('doc_details.html', clicked_doc_id=clicked_doc_id, doc=doc, page_title="Document Details")
 
 
 @app.route('/stats', methods=['GET'])

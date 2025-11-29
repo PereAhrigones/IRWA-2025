@@ -8,8 +8,40 @@
 <div><a href="/" >Home</a></div>
 <div><a href="/stats" >Stats</a></div>
 <div><a href="/dashboard" >Dashboard</a></div>
-<h1>Document Detail Page</h1>
-<p>This is a placeholder for document details.</p>
+{% if doc %}
+    <h1>{{ doc.title }}</h1>
+    <p>{{ doc.description or 'No description available.' }}</p>
+    <p><strong>Rating:</strong> {{ doc.average_rating or 'N/A' }}/5</p>
+    <p><strong>Brand:</strong> {{ doc.brand or 'N/A' }}</p>
+    <p><strong>Category:</strong> {{ doc.category or 'N/A' }}</p>
+    <p><strong>Sub-Category:</strong> {{ doc.sub_category or 'N/A' }}</p>
+    {% if doc.out_of_stock %}
+        <p style="color: #c8102e;"><strong>Status:</strong> Out of Stock</p>
+    {% elif doc.actual_price %}
+        <p><strong>Price:</strong> <span class="text-red" style="color: #c8102e; text-decoration: line-through;">{{ doc.actual_price or 'N/A' }}$ </span> &emsp; <span class="text-green" style="color: #00d55c; font-size: 2rem;">{{ doc.selling_price }}$</span></p>
+    {% else %}
+        <p><strong>Price:</strong> <span class="text-green" style="color: #00d55c; font-size: 2rem;">{{ doc.selling_price or 'N/A' }}$</span></p>
+    {% endif %}
+    <p><a href="{{ doc.url or '#' }}">Product link</a></p>
+
+    {% if doc.images %}
+        <div class="product-images" style="margin-top:10px; display:flex; gap:30px; flex-wrap:wrap;">
+            {% for img in doc.images %}
+                <div style="max-width:480px;">
+                    <a href="{{ img }}" target="_blank" rel="noopener noreferrer">
+                        <img src="{{ img }}" alt="{{ doc.title }}" style="width:125%; height:auto; border:1px solid #ddd; border-radius:4px;"/>
+                    </a>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p><em>No images available for this product.</em></p>
+    {% endif %}
+{% else %}
+    <h1>Document not found</h1>
+    <p>The requested document (id: {{ clicked_doc_id }}) was not found in the corpus.</p>
+{% endif %}
+<p>This is a placeholder for more document details.</p>
 <p>Here you can display more information about the document.</p>
 <p>For example, you might show the full text of the document, metadata, or other relevant details.</p>
 <p>You can also include links to related documents or resources.</p>
