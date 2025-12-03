@@ -13,6 +13,10 @@ class AnalyticsData:
     # fact_clicks is a dictionary with the click counters: key = doc id | value = click counter
     fact_clicks = dict([])
 
+    # Track time spent per document (aggregated)
+    # Structure: { doc_id: { 'total_seconds': float, 'visits': int } }
+    fact_time_spent = dict([])
+
     ### Please add your custom tables here:
 
     def save_query_terms(self, terms: str) -> int:
@@ -46,6 +50,25 @@ class AnalyticsData:
         )
         # Render the chart to HTML
         return chart.to_html()
+
+    def record_time_spent(self, doc_id: str, seconds: float):
+        """
+        Record time spent by users on a document detail page.
+        Aggregates total seconds and visit counts per document.
+        """
+        try:
+            seconds = float(seconds)
+        except Exception:
+            return None
+
+        if doc_id in self.fact_time_spent:
+            entry = self.fact_time_spent[doc_id]
+            entry['total_seconds'] += seconds
+            entry['visits'] += 1
+        else:
+            self.fact_time_spent[doc_id] = {'total_seconds': seconds, 'visits': 1}
+
+        return self.fact_time_spent[doc_id]
 
 
 class ClickedDoc:
