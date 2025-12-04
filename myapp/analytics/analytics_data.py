@@ -21,6 +21,18 @@ class AnalyticsData:
     # Structure: list of {'x': float, 'y': float, 'page': str, 'timestamp': datetime}
     fact_clicks_heatmap = []
 
+    # Track product link clicks from doc_details page
+    # Structure: { (doc_id, search_query): click_count }
+    fact_product_clicks = dict([])
+
+    # Track visits to results page per query
+    # Structure: { search_query: visit_count }
+    fact_results_visits = dict([])
+
+    # Track queries where users navigate beyond page 1
+    # Structure: { search_query: {'total_views': int, 'page_2_plus': int, 'max_page': int} }
+    fact_pagination_queries = dict([])
+
     def save_query_terms(self, terms: str) -> int:
         print(self)
         return random.randint(0, 100000)
@@ -73,6 +85,193 @@ class AnalyticsData:
 
         return self.fact_time_spent[key]
 
+    def record_product_click(self, doc_id: str, search_query: str = 'direct'):
+        """
+        Record when a user clicks the product link on doc_details page.
+        Used to calculate CTR (product clicks / doc views).
+        """
+        key = (doc_id, search_query)
+        if key in self.fact_product_clicks:
+            self.fact_product_clicks[key] += 1
+        else:
+            self.fact_product_clicks[key] = 1
+        return self.fact_product_clicks[key]
+
+    def get_ctr_stats(self):
+        """
+        Calculate Click-Through Rate for each (doc_id, query).
+        Returns list of dicts with doc_id, query, views, product_clicks, ctr.
+        """
+        stats = []
+        for key in self.fact_clicks.keys():
+            views = self.fact_clicks[key]
+            product_clicks = self.fact_product_clicks.get(key, 0)
+            ctr = (product_clicks / views * 100) if views > 0 else 0
+            stats.append({
+                'doc_id': key[0],
+                'query': key[1],
+                'views': views,
+                'product_clicks': product_clicks,
+                'ctr': round(ctr, 2)
+            })
+        return sorted(stats, key=lambda x: x['ctr'], reverse=True)
+
+    def record_results_visit(self, search_query: str):
+        """
+        Record a visit to the results page for a specific query.
+        Used to track how many times users return to results for each search.
+        """
+        if search_query in self.fact_results_visits:
+            self.fact_results_visits[search_query] += 1
+        else:
+            self.fact_results_visits[search_query] = 1
+        return self.fact_results_visits[search_query]
+
+    def record_pagination(self, search_query: str, page: int):
+        """
+        Record pagination behavior: track when users go beyond page 1.
+        """
+        if search_query not in self.fact_pagination_queries:
+            self.fact_pagination_queries[search_query] = {
+                'total_views': 0,
+                'page_2_plus': 0,
+                'max_page': 1
+            }
+        
+        entry = self.fact_pagination_queries[search_query]
+        entry['total_views'] += 1
+        
+        if page > 1:
+            entry['page_2_plus'] += 1
+        
+        if page > entry['max_page']:
+            entry['max_page'] = page
+        
+        return entry
+
+    def plot_results_visits(self):
+        """
+        Generate a bar chart showing return visits to results page per query.
+        """
+        if not self.fact_results_visits:
+            return """
+            <html>
+                <head><meta charset="utf-8"><title>No data</title></head>
+                <body style="font-family: Arial, sans-serif; color: #333;">
+                    <div style="padding:20px; text-align:center;">
+                        <h3>No results page visits recorded yet</h3>
+                        <p>Visit data will appear here once users search and view results.</p>
+                    </div>
+                </body>
+            </html>
+            """
+
+        # Prepare data for chart
+        data = [{'Query': query, 'Visits': count} 
+                for query, count in self.fact_results_visits.items()]
+        df = pd.DataFrame(data)
+        
+        # Sort by visits descending
+        df = df.sort_values('Visits', ascending=False)
+        
+        # Limit to top 15 queries for readability
+        if len(df) > 15:
+            df = df.head(15)
+        
+        # Create Altair chart
+        chart = alt.Chart(df).mark_bar().encode(
+            x=alt.X('Visits:Q', title='Number of Visits'),
+            y=alt.Y('Query:N', sort='-x', title='Search Query'),
+            color=alt.Color('Visits:Q', 
+                          scale=alt.Scale(scheme='blues'),
+                          legend=None),
+            tooltip=['Query', 'Visits']
+        ).properties(
+            title='Return Visits to Results Page by Query',
+            width=600,
+            height=max(300, len(df) * 25)
+        )
+        
+        return chart.to_html()
+
+    def plot_pagination_queries(self):
+        """
+        Generate a chart showing queries where users navigate beyond page 1.
+        """
+        if not self.fact_pagination_queries:
+            return """
+            <html>
+                <head><meta charset="utf-8"><title>No data</title></head>
+                <body style="font-family: Arial, sans-serif; color: #333;">
+                    <div style="padding:20px; text-align:center;">
+                        <h3>No pagination data recorded yet</h3>
+                        <p>Pagination behavior will appear here once users navigate through results.</p>
+                    </div>
+                </body>
+            </html>
+            """
+
+        # Prepare data
+        data = []
+        for query, stats in self.fact_pagination_queries.items():
+            pagination_rate = (stats['page_2_plus'] / stats['total_views'] * 100) if stats['total_views'] > 0 else 0
+            data.append({
+                'Query': query,
+                'Total Views': stats['total_views'],
+                'Page 2+ Views': stats['page_2_plus'],
+                'Max Page': stats['max_page'],
+                'Pagination Rate (%)': round(pagination_rate, 1)
+            })
+        
+        df = pd.DataFrame(data)
+        
+        # Filter to show only queries where users went beyond page 1
+        df_paginated = df[df['Page 2+ Views'] > 0]
+        
+        if df_paginated.empty:
+            return """
+            <html>
+                <head><meta charset="utf-8"><title>No pagination</title></head>
+                <body style="font-family: Arial, sans-serif; color: #333;">
+                    <div style="padding:20px; text-align:center;">
+                        <h3>No users have navigated beyond page 1 yet</h3>
+                        <p>Data will appear here when users view page 2 or higher.</p>
+                    </div>
+                </body>
+            </html>
+            """
+        
+        # Sort by pagination rate descending
+        df_paginated = df_paginated.sort_values('Pagination Rate (%)', ascending=False)
+        
+        # Limit to top 10 for readability
+        if len(df_paginated) > 10:
+            df_paginated = df_paginated.head(10)
+        
+        # Create Altair chart
+        chart = alt.Chart(df_paginated).mark_bar().encode(
+            x=alt.X('Pagination Rate (%):Q', 
+                   title='% of Views Beyond Page 1',
+                   scale=alt.Scale(domain=[0, 100])),
+            y=alt.Y('Query:N', sort='-x', title='Search Query'),
+            color=alt.Color('Pagination Rate (%):Q',
+                          scale=alt.Scale(scheme='oranges'),
+                          legend=None),
+            tooltip=[
+                alt.Tooltip('Query:N', title='Query'),
+                alt.Tooltip('Page 2+ Views:Q', title='Views Beyond Page 1'),
+                alt.Tooltip('Total Views:Q', title='Total Views'),
+                alt.Tooltip('Max Page:Q', title='Max Page Reached'),
+                alt.Tooltip('Pagination Rate (%):Q', title='Pagination Rate (%)')
+            ]
+        ).properties(
+            title='Queries Where Users Navigate Beyond Page 1',
+            width=600,
+            height=max(300, len(df_paginated) * 30)
+        )
+        
+        return chart.to_html()
+
     def record_click_heatmap(self, x: float, y: float, page: str):
         """
         Record click coordinates for heatmap visualization.
@@ -95,7 +294,7 @@ class AnalyticsData:
         self.fact_clicks_heatmap.append(click_data)
         return click_data
 
-    def plot_click_heatmap(self, page: str = None, width: int = 800, height: int = 600):
+    def plot_click_heatmap(self, page: str = None, width: int = 750, height: int = 600):
         """
         Generate a heatmap visualization of user clicks.
         Returns HTML with SVG heatmap or message if no data.

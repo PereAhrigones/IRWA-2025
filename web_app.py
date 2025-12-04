@@ -131,6 +131,12 @@ def results():
 
     session['last_found_count'] = total_results
 
+    # Record visit to results page for this query
+    analytics_data.record_results_visit(search_query)
+    
+    # Record pagination behavior (track when users go beyond page 1)
+    analytics_data.record_pagination(search_query, page)
+
     print(session)
 
     return render_template('results.html', results_list=page_results, page_title="Results", found_counter=total_results, rag_response=rag_response, page=page, total_pages=total_pages)
@@ -272,7 +278,17 @@ def dashboard():
     # sort by total time spent desc
     time_stats.sort(key=lambda r: r['total_seconds'], reverse=True)
 
-    return render_template('dashboard.html', visited_docs=visited_docs, time_stats=time_stats, page_title="Dashboard")
+    # Get CTR statistics (product clicks vs doc views)
+    ctr_stats = analytics_data.get_ctr_stats()
+    # Enrich with document titles
+    for stat in ctr_stats:
+        doc_id = stat['doc_id']
+        if doc_id in corpus:
+            stat['title'] = corpus[doc_id].title
+        else:
+            stat['title'] = doc_id
+
+    return render_template('dashboard.html', visited_docs=visited_docs, time_stats=time_stats, ctr_stats=ctr_stats, page_title="Dashboard")
 
 
 # New route added for generating an examples of basic Altair plot (used for dashboard)
@@ -311,6 +327,41 @@ def record_click():
 def plot_click_heatmap():
     page = request.args.get('page')
     return analytics_data.plot_click_heatmap(page=page)
+
+
+@app.route('/plot_results_visits', methods=['GET'])
+def plot_results_visits():
+    return analytics_data.plot_results_visits()
+
+
+@app.route('/plot_pagination_queries', methods=['GET'])
+def plot_pagination_queries():
+    return analytics_data.plot_pagination_queries()
+
+
+@app.route('/analytics/record_product_click', methods=['POST'])
+def record_product_click():
+    """
+    Endpoint to receive product link clicks from doc_details page.
+    Expects JSON payload: { 'pid': '<doc_id>' }
+    """
+    try:
+        payload = request.get_json(force=True)
+    except Exception as e:
+        print('Invalid JSON payload for record_product_click:', e)
+        return ("Bad Request", 400)
+
+    if not payload:
+        return ("Bad Request", 400)
+
+    pid = payload.get('pid')
+    if not pid:
+        return ("Missing pid", 400)
+
+    search_query = session.get('last_search_query', 'direct')
+    res = analytics_data.record_product_click(pid, search_query)
+    print(f"Recorded product click for ({pid}, {search_query}). Total: {res}")
+    return ({'status': 'ok', 'count': res}, 200)
 
 
 if __name__ == "__main__":

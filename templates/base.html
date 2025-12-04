@@ -9,8 +9,10 @@
     {% block header %}{% endblock %}
 </head>
 <body>
-<div><a href="/stats" >Stats</a></div>
-<div><a href="/dashboard" >Dashboard</a></div>
+<div style="position: fixed; top: 10px; left: 10px; background-color: #2c3e50; padding: 12px 15px; border-radius: 5px; z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+    <a href="/stats" style="color: white; text-decoration: none; display: block; margin-bottom: 8px; font-weight: bold; font-size: 14px;">📊 Stats</a>
+    <a href="/dashboard" style="color: white; text-decoration: none; display: block; font-weight: bold; font-size: 14px;">📈 Dashboard</a>
+</div>
 <div class="container">
     <div class='header text-center'>
         <div class="header-layout">

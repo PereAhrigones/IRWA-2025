@@ -1,98 +1,121 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Document Detail - IRWA Search Engine</title>
-</head>
-<body>
-<div><a href="/" >Home</a></div>
-<div><a href="/stats" >Stats</a></div>
-<div><a href="/dashboard" >Dashboard</a></div>
-{% if doc %}
-    <h1>{{ doc.title }}</h1>
-    <p>{{ doc.description or 'No description available.' }}</p>
-    <p><strong>Rating:</strong> {{ doc.average_rating or 'N/A' }}/5</p>
-    <p><strong>Brand:</strong> {{ doc.brand or 'N/A' }}</p>
-    <p><strong>Category:</strong> {{ doc.category or 'N/A' }}</p>
-    <p><strong>Sub-Category:</strong> {{ doc.sub_category or 'N/A' }}</p>
-    {% if doc.out_of_stock %}
-        <p style="color: #c8102e;"><strong>Status:</strong> Out of Stock</p>
-    {% elif doc.actual_price %}
-        <p><strong>Price:</strong> <span class="text-red" style="color: #c8102e; text-decoration: line-through;">{{ doc.actual_price or 'N/A' }}$ </span> &emsp; <span class="text-green" style="color: #00d55c; font-size: 2rem;">{{ doc.selling_price }}$</span></p>
-    {% else %}
-        <p><strong>Price:</strong> <span class="text-green" style="color: #00d55c; font-size: 2rem;">{{ doc.selling_price or 'N/A' }}$</span></p>
-    {% endif %}
-    <p><a href="{{ doc.url or '#' }}">Product link</a></p>
+{% extends "base.html" %}
+{% block page_title %}{{ page_title }}{% endblock %}
+{% block content %}
+    {% if doc %}
+        <h1>{{ doc.title }}</h1>
+        <p>{{ doc.description or 'No description available.' }}</p>
+        <p><strong>Rating:</strong> {{ doc.average_rating or 'N/A' }}/5</p>
+        <p><strong>Brand:</strong> {{ doc.brand or 'N/A' }}</p>
+        <p><strong>Category:</strong> {{ doc.category or 'N/A' }}</p>
+        <p><strong>Sub-Category:</strong> {{ doc.sub_category or 'N/A' }}</p>
+        {% if doc.out_of_stock %}
+            <p style="color: #c8102e;"><strong>Status:</strong> Out of Stock</p>
+        {% elif doc.actual_price %}
+            <p><strong>Price:</strong> <span class="text-red" style="color: #c8102e; text-decoration: line-through;">{{ doc.actual_price or 'N/A' }}$ </span> &emsp; <span class="text-green" style="color: #00d55c; font-size: 2rem;">{{ doc.selling_price }}$</span></p>
+        {% else %}
+            <p><strong>Price:</strong> <span class="text-green" style="color: #00d55c; font-size: 2rem;">{{ doc.selling_price or 'N/A' }}$</span></p>
+        {% endif %}
+        <p><a href="{{ doc.url or '#' }}" id="product-link" target="_blank">Product link</a></p>
 
-    {% if doc.images %}
-        <div class="product-images" style="margin-top:10px; display:flex; gap:30px; flex-wrap:wrap;">
-            {% for img in doc.images %}
-                <div style="max-width:480px;">
-                    <a href="{{ img }}" target="_blank" rel="noopener noreferrer">
-                        <img src="{{ img }}" alt="{{ doc.title }}" style="width:125%; height:auto; border:1px solid #ddd; border-radius:4px;"/>
-                    </a>
-                </div>
-            {% endfor %}
-        </div>
-    {% else %}
-        <p><em>No images available for this product.</em></p>
-    {% endif %}
-    
-    <!-- Time-on-page tracking script: sends aggregated seconds when the user leaves the page -->
-    <script>
-        (function(){
-            // Use performance.now for higher precision; fall back to Date
-            const start = (performance && performance.now) ? performance.now() : Date.now();
-            let visibleStart = start;
-            let accrued = 0; // milliseconds
+        {% if doc.images %}
+            <div class="product-images" style="margin-top:10px; display:flex; gap:30px; flex-wrap:wrap;">
+                {% for img in doc.images %}
+                    <div style="max-width:480px;">
+                        <a href="{{ img }}" target="_blank" rel="noopener noreferrer">
+                            <img src="{{ img }}" alt="{{ doc.title }}" style="width:125%; height:auto; border:1px solid #ddd; border-radius:4px;"/>
+                        </a>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p><em>No images available for this product.</em></p>
+        {% endif %}
+        
+        <!-- Time-on-page tracking script: sends aggregated seconds when the user leaves the page -->
+        <script>
+            (function(){
+                // Use performance.now for higher precision; fall back to Date
+                const start = (performance && performance.now) ? performance.now() : Date.now();
+                let visibleStart = start;
+                let accrued = 0; // milliseconds
 
-            function toSeconds(ms){ return Math.round((ms/1000) * 100) / 100; }
+                function toSeconds(ms){ return Math.round((ms/1000) * 100) / 100; }
 
-            function handleVisibilityChange(){
-                if (document.visibilityState === 'hidden'){
-                    // accumulate visible time
-                    const now = (performance && performance.now) ? performance.now() : Date.now();
-                    accrued += Math.max(0, now - visibleStart);
-                    visibleStart = now;
-                } else if (document.visibilityState === 'visible'){
-                    visibleStart = (performance && performance.now) ? performance.now() : Date.now();
-                }
-            }
-
-            document.addEventListener('visibilitychange', handleVisibilityChange);
-
-            // when the page is unloaded (tab closed or navigated away), send the data
-            function sendTiming(){
-                try{
-                    const now = (performance && performance.now) ? performance.now() : Date.now();
-                    accrued += Math.max(0, now - visibleStart);
-                    const seconds = toSeconds(accrued);
-                    const pid = '{{ clicked_doc_id | e }}';
-                    if (!pid) return;
-
-                    const payload = JSON.stringify({ pid: pid, seconds: seconds });
-
-                    
-                    if (navigator.sendBeacon){
-                        const blob = new Blob([payload], {type: 'application/json'});
-                        navigator.sendBeacon('/analytics/record_time', blob);
-                    } else {
-                        var xhr = new XMLHttpRequest();
-                        xhr.open('POST','/analytics/record_time', false);
-                        xhr.setRequestHeader('Content-Type','application/json;charset=UTF-8');
-                        try{ xhr.send(payload); }catch(e){}
+                function handleVisibilityChange(){
+                    if (document.visibilityState === 'hidden'){
+                        // accumulate visible time
+                        const now = (performance && performance.now) ? performance.now() : Date.now();
+                        accrued += Math.max(0, now - visibleStart);
+                        visibleStart = now;
+                    } else if (document.visibilityState === 'visible'){
+                        visibleStart = (performance && performance.now) ? performance.now() : Date.now();
                     }
-                }catch(e){ console.warn('time tracking failed', e); }
-            }
+                }
 
-            window.addEventListener('pagehide', sendTiming);
-            
-            window.addEventListener('unload', sendTiming);
-        })();
-    </script>
-{% else %}
-    <h1>Document not found</h1>
-    <p>The requested document (id: {{ clicked_doc_id }}) was not found in the corpus.</p>
-{% endif %}
-</body>
-</html>
+                document.addEventListener('visibilitychange', handleVisibilityChange);
+
+                // when the page is unloaded (tab closed or navigated away), send the data
+                function sendTiming(){
+                    try{
+                        const now = (performance && performance.now) ? performance.now() : Date.now();
+                        accrued += Math.max(0, now - visibleStart);
+                        const seconds = toSeconds(accrued);
+                        const pid = '{{ clicked_doc_id | e }}';
+                        if (!pid) return;
+
+                        const payload = JSON.stringify({ pid: pid, seconds: seconds });
+
+                        
+                        if (navigator.sendBeacon){
+                            const blob = new Blob([payload], {type: 'application/json'});
+                            navigator.sendBeacon('/analytics/record_time', blob);
+                        } else {
+                            var xhr = new XMLHttpRequest();
+                            xhr.open('POST','/analytics/record_time', false);
+                            xhr.setRequestHeader('Content-Type','application/json;charset=UTF-8');
+                            try{ xhr.send(payload); }catch(e){}
+                        }
+                    }catch(e){ console.warn('time tracking failed', e); }
+                }
+
+                window.addEventListener('pagehide', sendTiming);
+                
+                window.addEventListener('unload', sendTiming);
+            })();
+        </script>
+
+        <!-- Product link click tracking script -->
+        <script>
+            (function(){
+                const productLink = document.getElementById('product-link');
+                if (!productLink) return;
+
+                productLink.addEventListener('click', function(e){
+                    try {
+                        const pid = '{{ clicked_doc_id | e }}';
+                        if (!pid) return;
+
+                        const payload = JSON.stringify({ pid: pid });
+
+                        // Use sendBeacon for reliable tracking even when navigating away
+                        if (navigator.sendBeacon){
+                            const blob = new Blob([payload], {type: 'application/json'});
+                            navigator.sendBeacon('/analytics/record_product_click', blob);
+                        } else {
+                            // Fallback: async XHR (won't block navigation)
+                            var xhr = new XMLHttpRequest();
+                            xhr.open('POST','/analytics/record_product_click', true);
+                            xhr.setRequestHeader('Content-Type','application/json;charset=UTF-8');
+                            try{ xhr.send(payload); }catch(err){}
+                        }
+                    } catch(e){
+                        console.warn('product click tracking failed', e);
+                    }
+                });
+            })();
+        </script>
+    {% else %}
+        <h1>Document not found</h1>
+        <p>The requested document (id: {{ clicked_doc_id }}) was not found in the corpus.</p>
+    {% endif %}
+{% endblock %}
