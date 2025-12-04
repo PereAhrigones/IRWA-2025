@@ -6,11 +6,33 @@
         <p>&nbsp;</p>
         <p>&nbsp;</p>
         <form class="d-flex" method="POST" onSubmit='return validate();' action="/search">
-            <input class="form-control me-2" name="search-query" type="search" placeholder="Search" aria-label="Search"
+            <input class="search-text me-2" name="search-query" type="search" placeholder="Search" aria-label="Search"
                    autofocus="autofocus">
             <button class="btn btn-primary" type="submit" onclick='this.form.submit();'>Search</button>
             <input name="upf-irwa-hidden" type="hidden" value="123">
         </form>
+        <div class="row mt-5">
+            <!-- Stats box -->
+            <div class="col-md-6 mb-4">
+                <div class="info-box">
+                    <h4>Stats</h4>
+                    <a href="/stats">
+                        <img src="{{ url_for('static', filename='stats.jpg') }}" class="img-fluid box-image">
+                    </a>
+                </div>
+            </div>
+
+            <!-- Dashboard box -->
+            <div class="col-md-6 mb-4">
+                <div class="info-box">
+                    <h4>Dashboard</h4>
+                    <a href="/dashboard">
+                        <img src="{{ url_for('static', filename='dashboard.png') }}" class="img-fluid box-image">
+                    </a>
+                </div>
+            </div>
+        </div>
+
         <p>&nbsp;</p>
         <p>&nbsp;</p>
         <p>&nbsp;</p>
