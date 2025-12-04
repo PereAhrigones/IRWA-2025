@@ -28,8 +28,9 @@
 
 .header {
     font-size: 1.7em;
-    margin-inline-start: 0px;
+    margin-inline-start: 10px;
     margin-inline-end: 0px;
+    color: #752f06;
     font-weight: bold;
 }
 
@@ -49,14 +50,60 @@ input[type=submit]:hover {
 }
 
 .search-text {
-    border: 1px solid #5f6368;
+    border: 1px solid #c8102e;
     box-shadow: none;
     z-index: 3;
-    height: 42px;
-    margin: 0 auto;
-    width: auto;
+    border-radius: 8px;
+    height: 45px;
+    margin: 0px;
     min-width: 300px;
-    max-width: 584px;
-    font-size: 0.95em;
-    adding-left: 5px;
+    width: 784px;
+    max-width: 100%;
+    font-size: 1.1em;
+    padding-left: 10px;
+    font-family: 'Georgia', serif;
+}
+
+.btn-primary { /* Search Button */
+    margin-left: 8px;
+    font-family: 'Georgia', serif;
+}
+
+.header-layout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.logo-container { /* UPF Logo */
+    position: absolute;
+    left: 0%;
+}
+
+.header-title { /* IRWA Search Engine */
+    flex: 1;
+    text-align: center;
+    font-family: 'Georgia', serif;
+}
+
+.info-box h4 {
+    font-family: 'Georgia', serif;
+}
+
+/*/////////////////////////////// Background ///////////////////////////////////*/
+
+body {
+    background-image: url('../background.jpg');
+    background-size: 285px 178px;
+    background-position: center;
+    background-repeat: repeat;
+    /* background-attachment: fixed; /* optional: keeps it fixed on scroll */
+    
+    /* optional fallback color */
+    background-color: #f5f5f5;
+}
+/* optional: make container slightly opaque so text stays readable */
+.container {
+    background-color: rgba(255,255,255,0.92);
 }
