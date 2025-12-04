@@ -11,7 +11,7 @@ from myapp.analytics.analytics_data import AnalyticsData, ClickedDoc
 from myapp.search.load_corpus import load_corpus
 from myapp.search.objects import Document, StatsDocument
 from myapp.search.search_engine import SearchEngine
-from myapp.generation.rag import RAGGenerator
+from myapp.generation.rag import RAGGenerator, format_rag_response
 from dotenv import load_dotenv
 load_dotenv()  # take environment variables from .env
 
@@ -127,7 +127,7 @@ def results():
 
     print(session)
 
-    return render_template('results.html', results_list=page_results, page_title="Results", found_counter=total_results, rag_response=rag_response, page=page, total_pages=total_pages)
+    return render_template('results.html', results_list=page_results, page_title="Results", found_counter=total_results, rag_response=format_rag_response(rag_response), page=page, total_pages=total_pages)
 
 
 @app.route('/doc_details', methods=['GET'])
