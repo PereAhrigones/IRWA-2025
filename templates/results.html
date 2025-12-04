@@ -8,9 +8,28 @@
     Found <strong>{{ found_counter }}</strong> results...
     <hr>
     {% if rag_response %}
-        <div class="mb-4 p-3" style="border: 1px solid #ccc; border-radius: 5px; background-color: #f9f9f9;">
-            <h5>AI-Generated Summary:</h5>
-            <div class="rag-response">{{ rag_response|safe }}</div>
+        <!-- Collapsible AI Analysis Section -->
+        <div class="rag-container">
+            <div class="rag-header" onclick="toggleRagSection()">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mr-2 rag-icon">
+                            <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                        <h5 class="mb-0">AI-Powered Analysis</h5>
+                    </div>
+                    <button class="rag-toggle-btn" aria-label="Toggle AI analysis">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="rag-chevron">
+                            <path d="M6 9l6 6 6-6" />
+                        </svg>
+                    </button>
+                </div>
+                <div class="rag-subtitle">Click to expand/collapse detailed analysis</div>
+            </div>
+            
+            <div class="rag-content" id="ragContent">
+                <div class="rag-response">{{ rag_response|safe }}</div>
+            </div>
         </div>
     {% endif %}
     <hr>
@@ -80,5 +99,44 @@
             </ul>
         </nav>
     {% endif %}
-{% endblock %}
 
+
+
+<!-- JavaScript for collapsible RAG section -->
+    <script>
+    function toggleRagSection() {
+        const container = document.querySelector('.rag-container');
+        const content = document.getElementById('ragContent');
+        const chevron = document.querySelector('.rag-chevron');
+        
+        if (container.classList.contains('collapsed')) {
+            // Expand
+            container.classList.remove('collapsed');
+            content.style.maxHeight = content.scrollHeight + "px";
+            chevron.style.transform = "rotate(0deg)";
+            
+            // After expansion animation completes
+            setTimeout(() => {
+                content.style.maxHeight = "none";
+            }, 400);
+        } else {
+            // Collapse
+            content.style.maxHeight = content.scrollHeight + "px";
+            content.offsetHeight; // Force reflow
+            
+            container.classList.add('collapsed');
+            content.style.maxHeight = "0";
+            chevron.style.transform = "rotate(-90deg)";
+        }
+    }
+    
+    // Initialize - start expanded by default
+    document.addEventListener('DOMContentLoaded', function() {
+        const container = document.querySelector('.rag-container');
+        if (container && !container.classList.contains('collapsed')) {
+            const content = document.getElementById('ragContent');
+            content.style.maxHeight = content.scrollHeight + "px";
+        }
+    });
+    </script>
+{% endblock %}
