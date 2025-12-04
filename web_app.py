@@ -146,18 +146,64 @@ def doc_details():
     print("recovered var from session:", res)
 
     # get the query string parameters from request
-    clicked_doc_id = request.args["pid"]
+    clicked_doc_id = request.args.get("pid")
     print("click in id={}".format(clicked_doc_id))
 
-    # store data in statistics table 1
-    if clicked_doc_id in analytics_data.fact_clicks.keys():
-        analytics_data.fact_clicks[clicked_doc_id] += 1
+    # retrieve document from corpus if available
+    doc = None
+    if clicked_doc_id and clicked_doc_id in corpus:
+        doc = corpus[clicked_doc_id]
     else:
-        analytics_data.fact_clicks[clicked_doc_id] = 1
+        print(f"Document id {clicked_doc_id} not found in corpus")
+
+    # store data in statistics table 1
+    try:
+        # Prevent double-counting when the browser issues duplicate quick requests
+        last_pid = session.get('last_doc_viewed')
+        last_time = session.get('last_doc_viewed_time', 0)
+        now = time.time()
+
+        # Only count a new visit if it's a different pid or more than 5 seconds
+        if clicked_doc_id and (last_pid != clicked_doc_id or (now - last_time) > 5):
+            if clicked_doc_id in analytics_data.fact_clicks:
+                analytics_data.fact_clicks[clicked_doc_id] += 1
+            else:
+                analytics_data.fact_clicks[clicked_doc_id] = 1
+            session['last_doc_viewed'] = clicked_doc_id
+            session['last_doc_viewed_time'] = now
+        else:
+            print(f"Skipping duplicate increment for {clicked_doc_id}")
+    except Exception as e:
+        print('Error updating fact_clicks:', e)
 
     print("fact_clicks count for id={} is {}".format(clicked_doc_id, analytics_data.fact_clicks[clicked_doc_id]))
     print(analytics_data.fact_clicks)
-    return render_template('doc_details.html')
+    return render_template('doc_details.html', clicked_doc_id=clicked_doc_id, doc=doc, page_title="Document Details")
+
+
+@app.route('/analytics/record_time', methods=['POST'])
+def record_time():
+    """
+    Endpoint to receive time-spent analytics from the client.
+    Expects JSON payload: { 'pid': '<doc_id>', 'seconds': <float> }
+    """
+    try:
+        payload = request.get_json(force=True)
+    except Exception as e:
+        print('Invalid JSON payload for record_time:', e)
+        return ("Bad Request", 400)
+
+    if not payload:
+        return ("Bad Request", 400)
+
+    pid = payload.get('pid')
+    seconds = payload.get('seconds')
+    if not pid or seconds is None:
+        return ("Missing pid or seconds", 400)
+
+    res = analytics_data.record_time_spent(pid, seconds)
+    print(f"Recorded time for {pid}: {seconds} seconds. Aggregated: {res}")
+    return ({'status': 'ok', 'aggregated': res}, 200)
 
 
 @app.route('/stats', methods=['GET'])
@@ -191,7 +237,28 @@ def dashboard():
     visited_docs.sort(key=lambda doc: doc.counter, reverse=True)
 
     for doc in visited_docs: print(doc)
-    return render_template('dashboard.html', visited_docs=visited_docs)
+
+    # Build time spent statistics (if any)
+    time_stats = []
+    for doc_id, t in analytics_data.fact_time_spent.items():
+        d = corpus.get(doc_id)
+        title = d.title if d else doc_id
+        total_seconds = t.get('total_seconds', 0) if isinstance(t, dict) else float(t)
+        visits = t.get('visits', 0) if isinstance(t, dict) else 1
+        avg_seconds = (total_seconds / visits) if visits else 0
+        time_stats.append({
+            'pid': doc_id,
+            'title': title,
+            'total_seconds': round(total_seconds, 2),
+            'visits': visits,
+            'avg_seconds': round(avg_seconds, 2),
+            'url': d.url if d else '#'
+        })
+
+    # sort by total time spent desc
+    time_stats.sort(key=lambda r: r['total_seconds'], reverse=True)
+
+    return render_template('dashboard.html', visited_docs=visited_docs, time_stats=time_stats, page_title="Dashboard")
 
 
 # New route added for generating an examples of basic Altair plot (used for dashboard)

@@ -36,7 +36,7 @@ class SearchEngine:
         # Return all ranked results; pagination will be handled by the web layer
         for doc_id in best_results:
             doc = corpus[doc_id]
-            results.append(Document(pid=doc.pid, title=doc.title, description=doc.description, actual_price=doc.actual_price,
+            results.append(Document(pid=doc.pid, title=doc.title, description=doc.description, actual_price=doc.actual_price, selling_price=doc.selling_price,
                                     url="doc_details?pid={}&search_id={}&param2=2".format(doc.pid, search_id), ranking=random.random()))
         # results = search_in_corpus(search_query)
         return results

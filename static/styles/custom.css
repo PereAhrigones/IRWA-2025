@@ -10,6 +10,15 @@
     text-align: center;
 }
 
+.text-red {
+    color: #c8102e;
+}
+
+.text-green {
+    color: #28a745;
+    font-size: 2rem;
+}
+
 /*.btn-primary {*/
 /*    background-color: #c8102e;*/
 /*    border: #c8102e;*/

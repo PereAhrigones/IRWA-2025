@@ -25,6 +25,35 @@
     <h3>Dashboard</h3>
     <iframe src="/plot_number_of_views" width="600" height="400" style="border: none;"></iframe>
 
+    <h4 style="margin-top:24px;">Time Spent on Document Pages</h4>
+    {% if time_stats and time_stats|length > 0 %}
+        <div style="overflow:auto; max-width:100%; margin-top:12px;">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Document</th>
+                        <th>Total Seconds</th>
+                        <th>Visits</th>
+                        <th>Avg Seconds</th>
+                        <th>Link</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in time_stats %}
+                        <tr>
+                            <td>{{ r.title }}</td>
+                            <td>{{ r.total_seconds }}</td>
+                            <td>{{ (r.visits/2) | int }}</td> <!-- This is because for some reason visits are counted twice and I can't find where i messed it up so this is the fix -->
+                            <td>{{ r.avg_seconds*2 }}</td>
+                            <td><a href="{{ r.url }}" target="_blank">Open</a></td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <p><em>No time-on-page data recorded yet.</em></p>
+    {% endif %}
 
 {% endblock %}
 
