@@ -54,11 +54,19 @@ start_time = time.time()
 import gzip, pickle
 from pathlib import Path
 doc_lengths = len(corpus)
-doc_lenghts_dict = compute_doc_lengths(corpus)
+# doc_lenghts_dict = compute_doc_lengths(corpus)
 final_path = Path("data/index_snapshot.pkl.gz")
+final_path_2 = Path("data/doc_lengths.pkl.gz")
+
 with gzip.open(final_path, "rb") as f:
     inv_index, tf, df, idf, title_index = pickle.load(f)
 print("Total time to load the index: {} seconds" .format(np.round(time.time() - start_time, 2)))
+
+start_time = time.time()
+
+with gzip.open(final_path_2, "rb") as f:
+    doc_lenghts_dict = pickle.load(f)
+print("Total time to load the doc_lenths: {} seconds" .format(np.round(time.time() - start_time, 2)))
 
 # Home URL "/"
 @app.route('/')
