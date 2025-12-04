@@ -12,6 +12,7 @@ from myapp.analytics.analytics_data import AnalyticsData, ClickedDoc
 from myapp.search.load_corpus import load_corpus
 from myapp.search.objects import Document, StatsDocument
 from myapp.search.search_engine import SearchEngine
+from myapp.search.algorithms import compute_doc_lengths
 from myapp.generation.rag import RAGGenerator, format_rag_response
 from dotenv import load_dotenv
 load_dotenv()  # take environment variables from .env
@@ -53,6 +54,7 @@ start_time = time.time()
 import gzip, pickle
 from pathlib import Path
 doc_lengths = len(corpus)
+doc_lenghts_dict = compute_doc_lengths(corpus)
 final_path = Path("data/index_snapshot.pkl.gz")
 with gzip.open(final_path, "rb") as f:
     inv_index, tf, df, idf, title_index = pickle.load(f)
@@ -68,6 +70,7 @@ def index():
     session['some_var'] = "Some value that is kept in session"
     session["queries"] = []  # initialize empty list of queries
     session["start_time"] = str(datetime.datetime.now())
+    session["search_function"] = "custom"
 
     user_agent = request.headers.get('User-Agent')
     print("Raw user browser:", user_agent)
@@ -86,8 +89,10 @@ def index():
 def search_form_post():
     
     search_query = request.form['search-query']
+    algorithm = request.form.get('algorithm', 'custom')  # Get selected algorithm, default to custom
 
     session['last_search_query'] = search_query
+    session["search_function"] = algorithm  # Store selected algorithm in session
     session["queries"].append(search_query)
 
     search_id = analytics_data.save_query_terms(search_query)
@@ -105,7 +110,7 @@ def results():
         # nothing to show, redirect to home
         return redirect(url_for('index'))
     # compute full ranked results
-    results = search_engine.search(search_query, search_id, corpus, inv_index, idf, tf, title_index, doc_lengths)
+    results = search_engine.search(search_query, search_id, corpus, inv_index, df, idf, tf, title_index, doc_lengths, doc_lenghts_dict, session.get("search_function"))
 
     # pagination parameters (page from query string)
     try:
