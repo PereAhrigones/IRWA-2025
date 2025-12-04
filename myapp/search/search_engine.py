@@ -31,7 +31,7 @@ class SearchEngine:
 
         results = []
         ### You should implement your search logic here:
-        best_results = search_appg25(search_query, index, idf, tf, title_index, doc_lengths, corpus)  # replace with call to search algorithm
+        best_results = search_appg25(search_query, index, idf, tf, title_index, doc_lengths, corpus)
 
         # Return all ranked results; pagination will be handled by the web layer
         for doc_id in best_results:

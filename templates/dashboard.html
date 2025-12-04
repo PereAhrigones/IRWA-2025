@@ -25,6 +25,7 @@
     <h3>Dashboard</h3>
     <iframe src="/plot_number_of_views" width="600" height="400" style="border: none;"></iframe>
 
+
     <h4 style="margin-top:24px;">Time Spent on Document Pages</h4>
     {% if time_stats and time_stats|length > 0 %}
         <div style="overflow:auto; max-width:100%; margin-top:12px;">
@@ -32,6 +33,7 @@
                 <thead>
                     <tr>
                         <th>Document</th>
+                        <th>Query</th>
                         <th>Total Seconds</th>
                         <th>Visits</th>
                         <th>Avg Seconds</th>
@@ -42,6 +44,7 @@
                     {% for r in time_stats %}
                         <tr>
                             <td>{{ r.title }}</td>
+                            <td>{{ r.query }}</td>
                             <td>{{ r.total_seconds }}</td>
                             <td>{{ (r.visits)}}</td> <!-- For some browsers the number of visits gets duplicated. I don't know how to detect it nor how to fix it -->
                             <td>{{ r.avg_seconds }}</td>
@@ -54,6 +57,48 @@
     {% else %}
         <p><em>No time-on-page data recorded yet.</em></p>
     {% endif %}
+
+    <h4 style="margin-top:24px;">Product Link Click-Through Rate (CTR)</h4>
+    {% if ctr_stats and ctr_stats|length > 0 %}
+        <div style="overflow:auto; max-width:100%; margin-top:12px;">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Document</th>
+                        <th>Query</th>
+                        <th>Doc Views</th>
+                        <th>Product Clicks</th>
+                        <th>CTR (%)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for stat in ctr_stats %}
+                        <tr>
+                            <td>{{ stat.title }}</td>
+                            <td><span class="badge badge-info">{{ stat.query }}</span></td>
+                            <td>{{ stat.views }}</td>
+                            <td>{{ stat.product_clicks }}</td>
+                            <td>
+                                <strong style="color: {% if stat.ctr >= 50 %}#28a745{% elif stat.ctr >= 25 %}#ffc107{% else %}#dc3545{% endif %};">
+                                    {{ stat.ctr }}%
+                                </strong>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <p style="font-size:0.9em; color:#666; margin-top:10px;">
+                <strong>CTR</strong> = (Product Clicks / Document Views) × 100. 
+                Higher CTR indicates users found the product interesting enough to visit the external link.
+            </p>
+        </div>
+    {% else %}
+        <p><em>No CTR data recorded yet. Product link clicks will appear here once tracked.</em></p>
+    {% endif %}
+
+    <h4 style="margin-top:24px;">Click Heatmap</h4>
+    <iframe src="/plot_click_heatmap" width="750" height="650" style="border: none;"></iframe>
+
 
 {% endblock %}
 

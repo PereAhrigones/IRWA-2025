@@ -9,8 +9,10 @@
     {% block header %}{% endblock %}
 </head>
 <body>
-<div><a href="/stats" >Stats</a></div>
-<div><a href="/dashboard" >Dashboard</a></div>
+<div style="position: fixed; top: 10px; left: 10px; background-color: #2c3e50; padding: 12px 15px; border-radius: 5px; z-index: 1000; box-shadow: 0 2px 5px rgba(0,0,0,0.2);">
+    <a href="/stats" style="color: white; text-decoration: none; display: block; margin-bottom: 8px; font-weight: bold; font-size: 14px;">📊 Stats</a>
+    <a href="/dashboard" style="color: white; text-decoration: none; display: block; font-weight: bold; font-size: 14px;">📈 Dashboard</a>
+</div>
 <div class="container">
     <div class='header text-center'>
         <div class="header-layout">
@@ -29,5 +31,44 @@
     <hr>
     <div class='centered'>Information Retrieval and Web Analytics</div>
 </div>
+
+<!-- Global click heatmap tracking -->
+<script>
+    (function(){
+        // Detect current page
+        function getCurrentPage(){
+            const path = window.location.pathname;
+            if (path.includes('results')) return 'results';
+            if (path.includes('doc_details')) return 'doc_details';
+            if (path.includes('dashboard')) return 'dashboard';
+            if (path.includes('stats')) return 'stats';
+            return 'other';
+        }
+
+        // Track all clicks on the page
+        document.addEventListener('click', function(e){
+            try {
+                // Normalize coordinates to 0-1 range
+                const x = e.clientX / window.innerWidth;
+                const y = e.clientY / window.innerHeight;
+                const page = getCurrentPage();
+
+                const payload = JSON.stringify({
+                    x: x,
+                    y: y,
+                    page: page
+                });
+
+                // Use sendBeacon for reliability (no need to wait for response)
+                if (navigator.sendBeacon){
+                    const blob = new Blob([payload], {type: 'application/json'});
+                    navigator.sendBeacon('/analytics/record_click', blob);
+                }
+            } catch(e){
+                console.warn('Click tracking failed', e);
+            }
+        }, true); // Use capturing phase to catch all clicks
+    })();
+</script>
 </body>
 </html>

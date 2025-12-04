@@ -10,14 +10,28 @@ class AnalyticsData:
     Declare more variables to hold analytics tables.
     """
     # Example of statistics table
-    # fact_clicks is a dictionary with the click counters: key = doc id | value = click counter
+    # fact_clicks is a dictionary with the click counters: key = (doc_id, search_query) | value = click counter
     fact_clicks = dict([])
 
     # Track time spent per document (aggregated)
-    # Structure: { doc_id: { 'total_seconds': float, 'visits': int } }
+    # Structure: { (doc_id, search_query): { 'total_seconds': float, 'visits': int } }
     fact_time_spent = dict([])
 
-    ### Please add your custom tables here:
+    # Track click heatmap coordinates
+    # Structure: list of {'x': float, 'y': float, 'page': str, 'timestamp': datetime}
+    fact_clicks_heatmap = []
+
+    # Track product link clicks from doc_details page
+    # Structure: { (doc_id, search_query): click_count }
+    fact_product_clicks = dict([])
+
+    # Track visits to results page per query
+    # Structure: { search_query: visit_count }
+    fact_results_visits = dict([])
+
+    # Track queries where users navigate beyond page 1
+    # Structure: { search_query: {'total_views': int, 'page_2_plus': int, 'max_page': int} }
+    fact_pagination_queries = dict([])
 
     def save_query_terms(self, terms: str) -> int:
         print(self)
@@ -51,31 +65,351 @@ class AnalyticsData:
         # Render the chart to HTML
         return chart.to_html()
 
-    def record_time_spent(self, doc_id: str, seconds: float):
+    def record_time_spent(self, doc_id: str, seconds: float, search_query: str = 'direct'):
         """
         Record time spent by users on a document detail page.
-        Aggregates total seconds and visit counts per document.
+        Aggregates total seconds and visit counts per (doc_id, search_query) tuple.
         """
         try:
             seconds = float(seconds)
         except Exception:
             return None
 
-        if doc_id in self.fact_time_spent:
-            entry = self.fact_time_spent[doc_id]
+        key = (doc_id, search_query)
+        if key in self.fact_time_spent:
+            entry = self.fact_time_spent[key]
             entry['total_seconds'] += seconds
             entry['visits'] += 1
         else:
-            self.fact_time_spent[doc_id] = {'total_seconds': seconds, 'visits': 1}
+            self.fact_time_spent[key] = {'total_seconds': seconds, 'visits': 1}
 
-        return self.fact_time_spent[doc_id]
+        return self.fact_time_spent[key]
+
+    def record_product_click(self, doc_id: str, search_query: str = 'direct'):
+        """
+        Record when a user clicks the product link on doc_details page.
+        Used to calculate CTR (product clicks / doc views).
+        """
+        key = (doc_id, search_query)
+        if key in self.fact_product_clicks:
+            self.fact_product_clicks[key] += 1
+        else:
+            self.fact_product_clicks[key] = 1
+        return self.fact_product_clicks[key]
+
+    def get_ctr_stats(self):
+        """
+        Calculate Click-Through Rate for each (doc_id, query).
+        Returns list of dicts with doc_id, query, views, product_clicks, ctr.
+        """
+        stats = []
+        for key in self.fact_clicks.keys():
+            views = self.fact_clicks[key]
+            product_clicks = self.fact_product_clicks.get(key, 0)
+            ctr = (product_clicks / views * 100) if views > 0 else 0
+            stats.append({
+                'doc_id': key[0],
+                'query': key[1],
+                'views': views,
+                'product_clicks': product_clicks,
+                'ctr': round(ctr, 2)
+            })
+        return sorted(stats, key=lambda x: x['ctr'], reverse=True)
+
+    def record_results_visit(self, search_query: str):
+        """
+        Record a visit to the results page for a specific query.
+        Used to track how many times users return to results for each search.
+        """
+        if search_query in self.fact_results_visits:
+            self.fact_results_visits[search_query] += 1
+        else:
+            self.fact_results_visits[search_query] = 1
+        return self.fact_results_visits[search_query]
+
+    def record_pagination(self, search_query: str, page: int):
+        """
+        Record pagination behavior: track when users go beyond page 1.
+        """
+        if search_query not in self.fact_pagination_queries:
+            self.fact_pagination_queries[search_query] = {
+                'total_views': 0,
+                'page_2_plus': 0,
+                'max_page': 1
+            }
+        
+        entry = self.fact_pagination_queries[search_query]
+        entry['total_views'] += 1
+        
+        if page > 1:
+            entry['page_2_plus'] += 1
+        
+        if page > entry['max_page']:
+            entry['max_page'] = page
+        
+        return entry
+
+    def plot_results_visits(self):
+        """
+        Generate a bar chart showing return visits to results page per query.
+        """
+        if not self.fact_results_visits:
+            return """
+            <html>
+                <head><meta charset="utf-8"><title>No data</title></head>
+                <body style="font-family: Arial, sans-serif; color: #333;">
+                    <div style="padding:20px; text-align:center;">
+                        <h3>No results page visits recorded yet</h3>
+                        <p>Visit data will appear here once users search and view results.</p>
+                    </div>
+                </body>
+            </html>
+            """
+
+        # Prepare data for chart
+        data = [{'Query': query, 'Visits': count} 
+                for query, count in self.fact_results_visits.items()]
+        df = pd.DataFrame(data)
+        
+        # Sort by visits descending
+        df = df.sort_values('Visits', ascending=False)
+        
+        # Limit to top 15 queries for readability
+        if len(df) > 15:
+            df = df.head(15)
+        
+        # Create Altair chart
+        chart = alt.Chart(df).mark_bar().encode(
+            x=alt.X('Visits:Q', title='Number of Visits'),
+            y=alt.Y('Query:N', sort='-x', title='Search Query'),
+            color=alt.Color('Visits:Q', 
+                          scale=alt.Scale(scheme='blues'),
+                          legend=None),
+            tooltip=['Query', 'Visits']
+        ).properties(
+            title='Return Visits to Results Page by Query',
+            width=600,
+            height=max(300, len(df) * 25)
+        )
+        
+        return chart.to_html()
+
+    def plot_pagination_queries(self):
+        """
+        Generate a chart showing queries where users navigate beyond page 1.
+        """
+        if not self.fact_pagination_queries:
+            return """
+            <html>
+                <head><meta charset="utf-8"><title>No data</title></head>
+                <body style="font-family: Arial, sans-serif; color: #333;">
+                    <div style="padding:20px; text-align:center;">
+                        <h3>No pagination data recorded yet</h3>
+                        <p>Pagination behavior will appear here once users navigate through results.</p>
+                    </div>
+                </body>
+            </html>
+            """
+
+        # Prepare data
+        data = []
+        for query, stats in self.fact_pagination_queries.items():
+            pagination_rate = (stats['page_2_plus'] / stats['total_views'] * 100) if stats['total_views'] > 0 else 0
+            data.append({
+                'Query': query,
+                'Total Views': stats['total_views'],
+                'Page 2+ Views': stats['page_2_plus'],
+                'Max Page': stats['max_page'],
+                'Pagination Rate (%)': round(pagination_rate, 1)
+            })
+        
+        df = pd.DataFrame(data)
+        
+        # Filter to show only queries where users went beyond page 1
+        df_paginated = df[df['Page 2+ Views'] > 0]
+        
+        if df_paginated.empty:
+            return """
+            <html>
+                <head><meta charset="utf-8"><title>No pagination</title></head>
+                <body style="font-family: Arial, sans-serif; color: #333;">
+                    <div style="padding:20px; text-align:center;">
+                        <h3>No users have navigated beyond page 1 yet</h3>
+                        <p>Data will appear here when users view page 2 or higher.</p>
+                    </div>
+                </body>
+            </html>
+            """
+        
+        # Sort by pagination rate descending
+        df_paginated = df_paginated.sort_values('Pagination Rate (%)', ascending=False)
+        
+        # Limit to top 10 for readability
+        if len(df_paginated) > 10:
+            df_paginated = df_paginated.head(10)
+        
+        # Create Altair chart
+        chart = alt.Chart(df_paginated).mark_bar().encode(
+            x=alt.X('Pagination Rate (%):Q', 
+                   title='% of Views Beyond Page 1',
+                   scale=alt.Scale(domain=[0, 100])),
+            y=alt.Y('Query:N', sort='-x', title='Search Query'),
+            color=alt.Color('Pagination Rate (%):Q',
+                          scale=alt.Scale(scheme='oranges'),
+                          legend=None),
+            tooltip=[
+                alt.Tooltip('Query:N', title='Query'),
+                alt.Tooltip('Page 2+ Views:Q', title='Views Beyond Page 1'),
+                alt.Tooltip('Total Views:Q', title='Total Views'),
+                alt.Tooltip('Max Page:Q', title='Max Page Reached'),
+                alt.Tooltip('Pagination Rate (%):Q', title='Pagination Rate (%)')
+            ]
+        ).properties(
+            title='Queries Where Users Navigate Beyond Page 1',
+            width=600,
+            height=max(300, len(df_paginated) * 30)
+        )
+        
+        return chart.to_html()
+
+    def record_click_heatmap(self, x: float, y: float, page: str):
+        """
+        Record click coordinates for heatmap visualization.
+        x, y: click coordinates (0-1 normalized or pixel values)
+        page: page identifier (e.g., 'results', 'doc_details', 'search')
+        """
+        try:
+            x = float(x)
+            y = float(y)
+        except (ValueError, TypeError):
+            return None
+
+        import datetime
+        click_data = {
+            'x': x,
+            'y': y,
+            'page': str(page),
+            'timestamp': datetime.datetime.now().isoformat()
+        }
+        self.fact_clicks_heatmap.append(click_data)
+        return click_data
+
+    def plot_click_heatmap(self, page: str = None, width: int = 750, height: int = 600):
+        """
+        Generate a heatmap visualization of user clicks.
+        Returns HTML with SVG heatmap or message if no data.
+        """
+        if not self.fact_clicks_heatmap:
+            return """
+            <html>
+                <head><meta charset="utf-8"><title>Heatmap</title></head>
+                <body style="font-family: Arial, sans-serif; color: #333;">
+                    <div style="padding:20px; text-align:center;">
+                        <h3>No click data available yet</h3>
+                        <p>Click heatmap will appear here once users interact with the page.</p>
+                    </div>
+                </body>
+            </html>
+            """
+
+        # Filter by page if specified
+        clicks = [c for c in self.fact_clicks_heatmap if page is None or c.get('page') == page]
+        
+        if not clicks:
+            return f"""
+            <html>
+                <head><meta charset="utf-8"><title>Heatmap</title></head>
+                <body style="font-family: Arial, sans-serif; color: #333;">
+                    <div style="padding:20px; text-align:center;">
+                        <h3>No clicks recorded on page: {page}</h3>
+                    </div>
+                </body>
+            </html>
+            """
+
+        # Create a simple heatmap using a grid and density
+        # Bin clicks into a grid and color based on density
+        grid_cols, grid_rows = 10, 8
+        grid = [[0 for _ in range(grid_cols)] for _ in range(grid_rows)]
+
+        for click in clicks:
+            x = click.get('x', 0)
+            y = click.get('y', 0)
+            
+            # Normalize if values are > 1 (pixel coordinates)
+            if x > 1:
+                x = x / width
+            if y > 1:
+                y = y / height
+            
+            # Clamp to [0, 1]
+            x = max(0, min(1, x))
+            y = max(0, min(1, y))
+            
+            # Map to grid
+            col = int(x * (grid_cols - 1))
+            row = int(y * (grid_rows - 1))
+            grid[row][col] += 1
+
+        # Find max for color scaling
+        max_clicks = max(max(row) for row in grid) if any(any(row) for row in grid) else 1
+
+        # Generate SVG
+        cell_width = width / grid_cols
+        cell_height = height / grid_rows
+        
+        svg_cells = []
+        for row_idx, row in enumerate(grid):
+            for col_idx, count in enumerate(row):
+                x = col_idx * cell_width
+                y = row_idx * cell_height
+                
+                # Color intensity based on clicks (red gradient)
+                intensity = count / max_clicks if max_clicks > 0 else 0
+                # RGB: from light red to dark red
+                r = int(255)
+                g = int(255 * (1 - intensity * 0.7))
+                b = int(255 * (1 - intensity * 0.7))
+                color = f'rgb({r},{g},{b})'
+                opacity = 0.3 + (intensity * 0.7)
+                
+                svg_cells.append(f'''
+                    <rect x="{x}" y="{y}" width="{cell_width}" height="{cell_height}" 
+                          fill="{color}" opacity="{opacity}" stroke="#ccc" stroke-width="1"/>
+                    <text x="{x + cell_width/2}" y="{y + cell_height/2}" 
+                          text-anchor="middle" dominant-baseline="middle" 
+                          font-size="10" fill="#333" opacity="0.5">{count if count > 0 else ''}</text>
+                ''')
+
+        svg_content = f'''
+        <svg width="{width}" height="{height}" xmlns="http://www.w3.org/2000/svg" style="border: 1px solid #ccc;">
+            {''.join(svg_cells)}
+        </svg>
+        '''
+
+        return f"""
+        <html>
+            <head><meta charset="utf-8"><title>Click Heatmap</title></head>
+            <body style="font-family: Arial, sans-serif; color: #333;">
+                <div style="padding:20px;">
+                    <h3>Click Heatmap {f'({page})' if page else ''}</h3>
+                    <p>Total clicks: {len(clicks)}</p>
+                    {svg_content}
+                    <p style="margin-top:10px; font-size:0.9em; color:#666;">
+                        Red areas indicate higher click density.
+                    </p>
+                </div>
+            </body>
+        </html>
+        """
 
 
 class ClickedDoc:
-    def __init__(self, doc_id, description, counter):
+    def __init__(self, doc_id, description, counter, query=None):
         self.doc_id = doc_id
         self.description = description
         self.counter = counter
+        self.query = query
 
     def to_json(self):
         return self.__dict__
