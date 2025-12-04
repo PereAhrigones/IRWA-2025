@@ -250,7 +250,7 @@ def search_appg25(query, index, idf, tf, title_index, doc_lengths, documents, k1
     ranked_docs = rank_documents_appg25(query_terms, docs, index, idf, tf, title_index, doc_lengths, documents, k1, b, w_r, w_p) # rank documents
     return ranked_docs
 
-def search_search_fun(query, index, df, idf, tf, title_index, doc_lengths, documents, k1, b, w_r, w_p, search_fun):
+def search_search_fun(query, index, df, idf, tf, title_index, doc_lengths, doc_lengths_dict, documents, k1, b, w_r, w_p, search_fun):
     """
     Given a ranking function name as a string returns the ranked docs using that function
     Takes all ranking function arguments
@@ -258,7 +258,7 @@ def search_search_fun(query, index, df, idf, tf, title_index, doc_lengths, docum
     if search_fun == "search_tfidf":
         return search_tfidf(query, index, idf, tf, title_index)
     elif search_fun == "search_bm25":
-        return search_bm25(query, index, df, idf, tf, title_index, doc_lengths, k1, b)
+        return search_bm25(query, index, df, idf, tf, title_index, doc_lengths_dict, k1, b)
     elif search_fun == "custom":
         return search_appg25(query, index, idf, tf, title_index, doc_lengths, documents, k1, b, w_r, w_p)
     return search_appg25(query, index, idf, tf, title_index, doc_lengths, documents, k1, b, w_r, w_p) #default our ranking for ease

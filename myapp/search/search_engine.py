@@ -2,7 +2,7 @@ import random
 import numpy as np
 
 from myapp.search.objects import Document
-from myapp.search.algorithms import search_appg25
+from myapp.search.algorithms import search_search_fun
 
 
 def dummy_search(corpus: dict, search_id, num_results=20):
@@ -26,12 +26,13 @@ def dummy_search(corpus: dict, search_id, num_results=20):
 class SearchEngine:
     """Class that implements the search engine logic"""
 
-    def search(self, search_query, search_id, corpus, index, idf, tf, title_index, doc_lengths):
+    def search(self, search_query, search_id, corpus, index, df, idf, tf, title_index, doc_lengths, doc_lengths_dict, search_function: str = "custom"):
         print("Search query:", search_query)
+        print("Using search function:", search_function)
 
         results = []
         ### You should implement your search logic here:
-        best_results = search_appg25(search_query, index, idf, tf, title_index, doc_lengths, corpus)
+        best_results = search_search_fun(search_query, index, df, idf, tf, title_index, doc_lengths, doc_lengths_dict, corpus, 1.2, 0.75, 0.5, 0.5, search_function)
 
         # Return all ranked results; pagination will be handled by the web layer
         for doc_id in best_results:
