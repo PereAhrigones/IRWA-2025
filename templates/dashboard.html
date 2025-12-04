@@ -43,8 +43,8 @@
                         <tr>
                             <td>{{ r.title }}</td>
                             <td>{{ r.total_seconds }}</td>
-                            <td>{{ (r.visits/2) | int }}</td> <!-- This is because for some reason visits are counted twice and I can't find where i messed it up so this is the fix -->
-                            <td>{{ r.avg_seconds*2 }}</td>
+                            <td>{{ (r.visits)}}</td> <!-- For some browsers the number of visits gets duplicated. I don't know how to detect it nor how to fix it -->
+                            <td>{{ r.avg_seconds }}</td>
                             <td><a href="{{ r.url }}" target="_blank">Open</a></td>
                         </tr>
                     {% endfor %}
