@@ -37,7 +37,7 @@ class SearchEngine:
         for doc_id in best_results:
             doc = corpus[doc_id]
             results.append(Document(pid=doc.pid, title=doc.title, description=doc.description, actual_price=doc.actual_price,
-                                    selling_price=doc.selling_price, average_rating=doc.average_rating, discount=doc.discount, doc_url=doc.url,
+                                    selling_price=doc.selling_price, average_rating=doc.average_rating, discount=doc.discount, product_url=doc.url,
                                     url="doc_details?pid={}&search_id={}&param2=2".format(doc.pid, search_id)))
         # results = search_in_corpus(search_query)
         return results

@@ -267,5 +267,37 @@ def plot_number_of_views():
     return analytics_data.plot_number_of_views()
 
 
+@app.route('/analytics/record_click', methods=['POST'])
+def record_click():
+    """
+    Endpoint to receive click coordinates from the client for heatmap visualization.
+    Expects JSON payload: { 'x': <float>, 'y': <float>, 'page': '<page_id>' }
+    """
+    try:
+        payload = request.get_json(force=True)
+    except Exception as e:
+        print('Invalid JSON payload for record_click:', e)
+        return ("Bad Request", 400)
+
+    if not payload:
+        return ("Bad Request", 400)
+
+    x = payload.get('x')
+    y = payload.get('y')
+    page = payload.get('page', 'unknown')
+    
+    if x is None or y is None:
+        return ("Missing x or y", 400)
+
+    res = analytics_data.record_click_heatmap(x, y, page)
+    return ({'status': 'ok', 'click': res}, 200)
+
+
+@app.route('/plot_click_heatmap', methods=['GET'])
+def plot_click_heatmap():
+    page = request.args.get('page')
+    return analytics_data.plot_click_heatmap(page=page)
+
+
 if __name__ == "__main__":
     app.run(port=8088, host="0.0.0.0", threaded=False, debug=os.getenv("DEBUG"))
