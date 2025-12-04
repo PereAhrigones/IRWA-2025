@@ -530,8 +530,8 @@ def get_score(documents, w_rating = 0.5, w_price = 0.5):
     Given a list of documents, compute min and max price and score for each document
     """
     prices = [doc.selling_price if doc.selling_price is not None else doc.actual_price for doc in documents]
-    min_price = np.nanmin(prices)
-    max_price = np.nanmax(prices)
+    min_price = min([p for p in prices if p is not None])
+    max_price = max([p for p in prices if p is not None])
 
     scores = {}
     for doc in documents:
