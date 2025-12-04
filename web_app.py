@@ -139,7 +139,7 @@ def results():
 
     print(session)
 
-    return render_template('results.html', results_list=page_results, page_title="Results", found_counter=total_results, rag_response=rag_response, page=page, total_pages=total_pages)
+    return render_template('results.html', results_list=page_results, page_title="Results", found_counter=total_results, rag_response=rag_response, page=page, total_pages=total_pages, search_query=search_query)
 
 
 @app.route('/doc_details', methods=['GET'])

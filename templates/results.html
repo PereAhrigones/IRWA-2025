@@ -1,10 +1,11 @@
 {% extends "base.html" %}
 {% block page_title %}{{ page_title }}{% endblock %}
 {% block content %}
-    Found <strong>{{ found_counter }}</strong> results...
+    <span style="font-size: 1.5rem;">Search query: <strong>{{ search_query }}</strong></span>
     {% if page is defined and total_pages is defined %}
         <div class="mb-2">Page <strong>{{ page }}</strong> of <strong>{{ total_pages }}</strong></div>
     {% endif %}
+    Found <strong>{{ found_counter }}</strong> results...
     <hr>
     {% if rag_response %}
         <div class="mb-4 p-3" style="border: 1px solid #ccc; border-radius: 5px; background-color: #f9f9f9;">
