@@ -117,17 +117,130 @@ body {
     background-color: rgba(255,255,255,0.92);
 }
 
-.rag-response {
+/*//////////////////////////////////////////////////////////////////////////////*/
+.rag-summary {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     line-height: 1.6;
     color: #333;
-    padding: 10px;
-    background: #f8f9fa;
-    border-radius: 8px;
-    border-left: 4px solid #007bff;
+    padding: 20px;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+    border-radius: 12px;
+    border-left: 6px solid #007bff;
+    margin: 25px 0;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
 }
 
-.rag-response strong {
+.rag-section {
     color: #0056b3;
-    font-weight: 600;
+    font-size: 1.3rem;
+    font-weight: 700;
+    margin: 20px 0 12px 0;
+    padding-bottom: 8px;
+    border-bottom: 2px solid rgba(0, 86, 179, 0.2);
 }
+
+.rag-subsection {
+    color: #495057;
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin: 16px 0 10px 0;
+    padding-left: 10px;
+    border-left: 3px solid #6c757d;
+}
+
+.rag-bullet {
+    padding: 6px 0 6px 20px;
+    position: relative;
+    margin: 8px 0;
+}
+
+.rag-bullet:before {
+    content: "•";
+    position: absolute;
+    left: 0;
+    color: #007bff;
+    font-weight: bold;
+}
+
+.pid-bullet {
+    background: rgba(0, 123, 255, 0.05);
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin: 8px 0;
+    border-left: 3px solid #28a745;
+}
+
+.pid-highlight {
+    color: #28a745;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+    background: rgba(40, 167, 69, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.rag-numbered {
+    padding: 8px 0 8px 25px;
+    position: relative;
+    margin: 8px 0;
+    counter-increment: rag-counter;
+}
+
+.rag-numbered:before {
+    content: counter(rag-counter) ".";
+    position: absolute;
+    left: 0;
+    color: #007bff;
+    font-weight: bold;
+}
+
+.rag-key-value {
+    padding: 10px 15px;
+    margin: 10px 0;
+    background: white;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.rag-key {
+    color: #495057;
+    font-weight: 600;
+    display: inline-block;
+    min-width: 120px;
+}
+
+.rag-value {
+    color: #212529;
+}
+
+.rag-text {
+    padding: 8px 0;
+    margin: 8px 0;
+}
+
+.section-spacer {
+    height: 20px;
+}
+
+/* Add some styling for better readability */
+.rag-summary strong {
+    color: #0056b3;
+    font-weight: 700;
+    background: rgba(0, 86, 179, 0.08);
+    padding: 0 4px;
+    border-radius: 3px;
+}
+
+/* Reset counter for each summary */
+.rag-summary {
+    counter-reset: rag-counter;
+}
+
+/* Hover effects */
+.pid-bullet:hover {
+    background: rgba(0, 123, 255, 0.1);
+    transform: translateX(3px);
+    transition: all 0.2s ease;
+}
+
+/*//////////////////////////////////////////////////////////////////////////////*/

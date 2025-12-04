@@ -1,4 +1,5 @@
 import os
+import re
 from groq import Groq
 from dotenv import load_dotenv
 load_dotenv()  # take environment variables from .env
@@ -18,15 +19,28 @@ class RAGGenerator:
         Explain: How well do results match the query "{user_query}"?, Grade: Excellent/Good/Fair/Poor with brief explanation
 
         2. 
-        - AVAILABILITY STATUS
-        Explain: Number of in-stock vs out-of-stock items
+        - PRICING LANDSCAPE
+        Explain: Price range found: [Lowest] to [Highest], Average discount percentage across products, and nothing more, do not give me any product/document
 
         3. 
+        - AVAILABILITY STATUS
+        Explain: Number of in-stock vs out-of-stock items, if it is false that X products are out of stock Say "X products are available", else Say "X products are out of Stock", and nothing more
+
+        4. 
+        - QUALITY INDICATORS
+        Explain: Average rating across all products, Number of good rated products (rating ≥ 4.0), Number of products with concerning ratings (rating < 3.0), just the numbers and nothing more, do not give me any product/document
+
+        5. 
         - TOP 3 RECOMMENDATIONS
+        Here it is the time to show products/documents to the user.
         Rank products considering: query relevance, price, rating, and availability:
-        1. **Best Overall**: [PID] - [Title] - [Key reasons: price, rating, relevance]
+        1. **Best Overall**: [PID] - [Title] - [Using all the info of the products/documents, short explanation of why this is the best document]
         2. **Best Value**: [PID] - [Title] - [Best discount-to-quality ratio]
         3. **Premium Choice**: [PID] - [Title] - [Highest rated if budget allows]
+
+        6. 
+        - SEARCH IMPROVEMENTS
+        Explain: (Create this section if needed, else do not show it) Suggested refined queries for better results, What might be missing from current results. Do not textually use product/document names as new queries.
 
         ## IMPORTANT FORMATTING RULES:
         - Use bullet points for lists
@@ -56,7 +70,7 @@ class RAGGenerator:
             # Format the retrieved results for the prompt
             formatted_results = "\n\n".join(
                 [f"- PID: {res.pid}, Title: {res.title}, Original Price: {res.actual_price}, Price with applied discount: {res.selling_price}, \
-                 Average Rating: {res.avg_rating}, \
+                 Average Rating: {res.average_rating}, \
                  It is {res.out_of_stock} that the product is out of stock. \
                  Description of the product: {res.description}" for res in retrieved_results[:top_N]]
             )
@@ -124,39 +138,73 @@ class RAGGenerator:
         return '<br>'.join(result_lines)
     
 
+import re  # Add this import
+
 def format_rag_response(generation: str) -> str:
     """
     Format RAG response for HTML display with proper formatting.
+    Handles: ## Sections, ### Subsections, * Bullets, - Bullets, **Bold**, PID references
     """
     if not generation:
         return ""
     
-    # Add line breaks before each bullet point
     lines = generation.split('\n')
     formatted_lines = []
+    in_section = False
     
     for line in lines:
         line = line.strip()
         if not line:
+            if in_section:  # Add spacing between sections
+                formatted_lines.append('<div class="section-spacer"></div>')
+                in_section = False
             continue
         
-        # Format bullet points with bold labels
-        if line.startswith('-'):
-            # Find the colon position
-            colon_pos = line.find(':')
-            if colon_pos > 0:
-                # Split into label and content
-                label = line[:colon_pos]
-                content = line[colon_pos + 1:].strip()
-                
-                # Format as: <strong>label</strong>: content
-                formatted = f"<strong>{label}</strong>: {content}"
-                formatted_lines.append(formatted)
+        # Handle section headers (##)
+        if line.startswith('## '):
+            title = line[3:].strip()
+            formatted_lines.append(f'<h4 class="rag-section">{title}</h4>')
+            in_section = True
+        
+        # Handle subsection headers (###)
+        elif line.startswith('### '):
+            title = line[4:].strip()
+            formatted_lines.append(f'<h5 class="rag-subsection">{title}</h5>')
+            in_section = True
+        
+        # Handle bullet points (* or -)
+        elif line.startswith('* ') or line.startswith('- '):
+            content = line[2:].strip()
+            
+            # Check if it's a PID reference
+            if 'PID:' in content or 'PID: ' in content:
+                # Highlight PID references
+                content = content.replace('PID:', '<span class="pid-highlight">PID:</span>')
+                formatted_lines.append(f'<div class="rag-bullet pid-bullet">• {content}</div>')
             else:
-                formatted_lines.append(f"<strong>{line}</strong>")
+                formatted_lines.append(f'<div class="rag-bullet">• {content}</div>')
+        
+        # Handle numbered lists (1., 2., etc.)
+        elif re.match(r'^\d+\.\s', line):
+            formatted_lines.append(f'<div class="rag-numbered">{line}</div>')
+        
+        # Handle bold text (**text**)
+        elif '**' in line:
+            # Replace all **text** with <strong>text</strong>
+            bold_line = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', line)
+            formatted_lines.append(f'<div class="rag-text">{bold_line}</div>')
+        
+        # Regular text
         else:
-            # For non-bullet text, just add as paragraph
-            formatted_lines.append(line)
+            # Check if line contains a colon (key: value pattern)
+            if ': ' in line:
+                parts = line.split(': ', 1)
+                if len(parts) == 2:
+                    key, value = parts
+                    formatted_lines.append(f'<div class="rag-key-value"><span class="rag-key">{key}:</span> <span class="rag-value">{value}</span></div>')
+                    continue
+            
+            formatted_lines.append(f'<div class="rag-text">{line}</div>')
     
-    # Join with line breaks
-    return '<br>'.join(formatted_lines)
+    # Join all formatted lines
+    return '\n'.join(formatted_lines)
