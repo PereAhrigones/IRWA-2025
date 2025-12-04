@@ -10,11 +10,11 @@ class AnalyticsData:
     Declare more variables to hold analytics tables.
     """
     # Example of statistics table
-    # fact_clicks is a dictionary with the click counters: key = doc id | value = click counter
+    # fact_clicks is a dictionary with the click counters: key = (doc_id, search_query) | value = click counter
     fact_clicks = dict([])
 
     # Track time spent per document (aggregated)
-    # Structure: { doc_id: { 'total_seconds': float, 'visits': int } }
+    # Structure: { (doc_id, search_query): { 'total_seconds': float, 'visits': int } }
     fact_time_spent = dict([])
 
     # Track click heatmap coordinates
@@ -53,24 +53,25 @@ class AnalyticsData:
         # Render the chart to HTML
         return chart.to_html()
 
-    def record_time_spent(self, doc_id: str, seconds: float):
+    def record_time_spent(self, doc_id: str, seconds: float, search_query: str = 'direct'):
         """
         Record time spent by users on a document detail page.
-        Aggregates total seconds and visit counts per document.
+        Aggregates total seconds and visit counts per (doc_id, search_query) tuple.
         """
         try:
             seconds = float(seconds)
         except Exception:
             return None
 
-        if doc_id in self.fact_time_spent:
-            entry = self.fact_time_spent[doc_id]
+        key = (doc_id, search_query)
+        if key in self.fact_time_spent:
+            entry = self.fact_time_spent[key]
             entry['total_seconds'] += seconds
             entry['visits'] += 1
         else:
-            self.fact_time_spent[doc_id] = {'total_seconds': seconds, 'visits': 1}
+            self.fact_time_spent[key] = {'total_seconds': seconds, 'visits': 1}
 
-        return self.fact_time_spent[doc_id]
+        return self.fact_time_spent[key]
 
     def record_click_heatmap(self, x: float, y: float, page: str):
         """
@@ -205,10 +206,11 @@ class AnalyticsData:
 
 
 class ClickedDoc:
-    def __init__(self, doc_id, description, counter):
+    def __init__(self, doc_id, description, counter, query=None):
         self.doc_id = doc_id
         self.description = description
         self.counter = counter
+        self.query = query
 
     def to_json(self):
         return self.__dict__

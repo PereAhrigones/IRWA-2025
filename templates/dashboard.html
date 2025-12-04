@@ -35,6 +35,7 @@
                 <thead>
                     <tr>
                         <th>Document</th>
+                        <th>Query</th>
                         <th>Total Seconds</th>
                         <th>Visits</th>
                         <th>Avg Seconds</th>
@@ -45,6 +46,7 @@
                     {% for r in time_stats %}
                         <tr>
                             <td>{{ r.title }}</td>
+                            <td>{{ r.query }}</td>
                             <td>{{ r.total_seconds }}</td>
                             <td>{{ (r.visits)}}</td> <!-- For some browsers the number of visits gets duplicated. I don't know how to detect it nor how to fix it -->
                             <td>{{ r.avg_seconds }}</td>

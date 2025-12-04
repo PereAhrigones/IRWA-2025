@@ -7,9 +7,75 @@
     {% for doc in clicks_data %}
         <div class="pb-3">
             <div class="">
-                <span class="text-dark"> ({{ doc.count }} visits) </span> — id: {{ doc.pid }} — {{ doc.title }} - {{ doc.description }}
+                <span class="text-dark"> ({{ doc.count }} visits) </span> — id: {{ doc.pid }} — {{ doc.title }} - <b>Query:</b> {{ doc.query }}
             </div>
         </div>
         <hr>
     {% endfor %}
+    <h4>User Information:</h4>
+    <div class="card" style="max-width: 600px; margin: 20px 0;">
+        <div class="card-body">
+            <h5 class="card-title">
+                <i class="bi bi-person-circle"></i> Session Details
+            </h5>
+            
+            <div class="row mb-3">
+                <div class="col-md-12">
+                    <p class="mb-1"><strong>IP Address:</strong> <span class="badge badge-secondary">{{ ip }}</span></p>
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-12">
+                    <p class="mb-1"><strong>Session Start Time:</strong> <span class="badge badge-secondary">{{ date }}</span></p>
+                </div>
+            </div>
+
+            {% if agent %}
+                <div class="row">
+                    <div class="col-md-6 mb-2">
+                        <div class="border rounded p-2 bg-light">
+                            <small class="text-muted">Browser</small>
+                            <p class="mb-0"><strong>{{ agent.browser.name if agent.browser else 'Unknown' }}</strong></p>
+                            <small>{{ agent.browser.version if agent.browser else '' }}</small>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-2">
+                        <div class="border rounded p-2 bg-light">
+                            <small class="text-muted">Operating System</small>
+                            <p class="mb-0"><strong>{{ agent.os.name if agent.os else 'Unknown' }}</strong></p>
+                            <small>{{ agent.os.version if agent.os else '' }}</small>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mt-2">
+                    <div class="col-md-6 mb-2">
+                        <div class="border rounded p-2 bg-light">
+                            <small class="text-muted">Platform</small>
+                            <p class="mb-0"><strong>{{ agent.platform.name if agent.platform else 'Unknown' }}</strong></p>
+                            <small>{{ agent.platform.version if agent.platform else '' }}</small>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6 mb-2">
+                        <div class="border rounded p-2 bg-light">
+                            <small class="text-muted">Bot Detection</small>
+                            <p class="mb-0">
+                                {% if agent.bot %}
+                                    <span class="badge badge-warning">Bot Detected</span>
+                                {% else %}
+                                    <span class="badge badge-success">Human User</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            {% else %}
+                <p class="text-muted">User agent information not available.</p>
+            {% endif %}
+        </div>
+    </div>
 {% endblock %}
+
+

@@ -2,6 +2,7 @@ import os
 from json import JSONEncoder
 import time
 import numpy as np
+import datetime
 
 import httpagentparser  # for getting the user agent as json
 from flask import Flask, render_template, session, redirect, url_for
@@ -65,12 +66,16 @@ def index():
     # flask server creates a session by persisting a cookie in the user's browser.
     # the 'session' object keeps data between multiple requests. Example:
     session['some_var'] = "Some value that is kept in session"
+    session["queries"] = []  # initialize empty list of queries
+    session["start_time"] = str(datetime.datetime.now())
 
     user_agent = request.headers.get('User-Agent')
     print("Raw user browser:", user_agent)
 
     user_ip = request.remote_addr
     agent = httpagentparser.detect(user_agent)
+    session['user_agent'] = agent # This mistakes Windows 11 for Windows 10
+    session['user_ip'] = user_ip
 
     print("Remote IP: {} - JSON user browser {}".format(user_ip, agent))
     print(session)
@@ -83,6 +88,7 @@ def search_form_post():
     search_query = request.form['search-query']
 
     session['last_search_query'] = search_query
+    session["queries"].append(search_query)
 
     search_id = analytics_data.save_query_terms(search_query)
     # Use Post-Redirect-Get pattern: store search info in session and redirect to GET results route
@@ -162,13 +168,15 @@ def doc_details():
         last_pid = session.get('last_doc_viewed')
         last_time = session.get('last_doc_viewed_time', 0)
         now = time.time()
+        search_query = session.get('last_search_query', 'direct')
 
         # Only count a new visit if it's a different pid or more than 5 seconds
         if clicked_doc_id and (last_pid != clicked_doc_id or (now - last_time) > 5):
-            if clicked_doc_id in analytics_data.fact_clicks:
-                analytics_data.fact_clicks[clicked_doc_id] += 1
+            click_key = (clicked_doc_id, search_query)
+            if click_key in analytics_data.fact_clicks:
+                analytics_data.fact_clicks[click_key] += 1
             else:
-                analytics_data.fact_clicks[clicked_doc_id] = 1
+                analytics_data.fact_clicks[click_key] = 1
             session['last_doc_viewed'] = clicked_doc_id
             session['last_doc_viewed_time'] = now
         else:
@@ -176,7 +184,8 @@ def doc_details():
     except Exception as e:
         print('Error updating fact_clicks:', e)
 
-    print("fact_clicks count for id={} is {}".format(clicked_doc_id, analytics_data.fact_clicks[clicked_doc_id]))
+    click_key = (clicked_doc_id, session.get('last_search_query', 'direct'))
+    print(f"fact_clicks count for {click_key} is {analytics_data.fact_clicks.get(click_key, 0)}")
     print(analytics_data.fact_clicks)
     return render_template('doc_details.html', clicked_doc_id=clicked_doc_id, doc=doc, page_title="Document Details")
 
@@ -201,8 +210,9 @@ def record_time():
     if not pid or seconds is None:
         return ("Missing pid or seconds", 400)
 
-    res = analytics_data.record_time_spent(pid, seconds)
-    print(f"Recorded time for {pid}: {seconds} seconds. Aggregated: {res}")
+    search_query = session.get('last_search_query', 'direct')
+    res = analytics_data.record_time_spent(pid, seconds, search_query)
+    print(f"Recorded time for ({pid}, {search_query}): {seconds} seconds. Aggregated: {res}")
     return ({'status': 'ok', 'aggregated': res}, 200)
 
 
@@ -214,24 +224,26 @@ def stats():
     """
 
     docs = []
-    for doc_id in analytics_data.fact_clicks:
-        row: Document = corpus[doc_id]
-        count = analytics_data.fact_clicks[doc_id]
-        doc = StatsDocument(pid=row.pid, title=row.title, description=row.description, url=row.url, count=count)
-        docs.append(doc)
+    for (doc_id, query), count in analytics_data.fact_clicks.items():
+        if doc_id in corpus:
+            row: Document = corpus[doc_id]
+            doc = StatsDocument(pid=row.pid, title=row.title, description=row.description, url=row.url, count=count)
+            doc.query = query  # Store query info in doc
+            docs.append(doc)
     
     # simulate sort by ranking
     docs.sort(key=lambda doc: doc.count, reverse=True)
-    return render_template('stats.html', clicks_data=docs)
+    return render_template('stats.html', clicks_data=docs, agent=session.get('user_agent'), ip=session.get('user_ip'), date=session.get('start_time'))
 
 
 @app.route('/dashboard', methods=['GET'])
 def dashboard():
     visited_docs = []
-    for doc_id in analytics_data.fact_clicks.keys():
-        d: Document = corpus[doc_id]
-        doc = ClickedDoc(doc_id, d.description, analytics_data.fact_clicks[doc_id])
-        visited_docs.append(doc)
+    for (doc_id, query), count in analytics_data.fact_clicks.items():
+        if doc_id in corpus:
+            d: Document = corpus[doc_id]
+            doc = ClickedDoc(doc_id, d.description, count, query)
+            visited_docs.append(doc)
 
     # simulate sort by ranking
     visited_docs.sort(key=lambda doc: doc.counter, reverse=True)
@@ -240,20 +252,22 @@ def dashboard():
 
     # Build time spent statistics (if any)
     time_stats = []
-    for doc_id, t in analytics_data.fact_time_spent.items():
-        d = corpus.get(doc_id)
-        title = d.title if d else doc_id
-        total_seconds = t.get('total_seconds', 0) if isinstance(t, dict) else float(t)
-        visits = t.get('visits', 0) if isinstance(t, dict) else 1
-        avg_seconds = (total_seconds / visits) if visits else 0
-        time_stats.append({
-            'pid': doc_id,
-            'title': title,
-            'total_seconds': round(total_seconds, 2),
-            'visits': visits,
-            'avg_seconds': round(avg_seconds, 2),
-            'url': d.url if d else '#'
-        })
+    for (doc_id, query), t in analytics_data.fact_time_spent.items():
+        if doc_id in corpus:
+            d = corpus[doc_id]
+            title = d.title if d else doc_id
+            total_seconds = t.get('total_seconds', 0) if isinstance(t, dict) else float(t)
+            visits = t.get('visits', 0) if isinstance(t, dict) else 1
+            avg_seconds = (total_seconds / visits) if visits else 0
+            time_stats.append({
+                'pid': doc_id,
+                'title': title,
+                'query': query,
+                'total_seconds': round(total_seconds, 2),
+                'visits': visits,
+                'avg_seconds': round(avg_seconds, 2),
+                'url': d.url if d else '#'
+            })
 
     # sort by total time spent desc
     time_stats.sort(key=lambda r: r['total_seconds'], reverse=True)

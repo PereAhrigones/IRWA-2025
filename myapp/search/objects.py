@@ -91,6 +91,7 @@ class StatsDocument(BaseModel):
     description: Optional[str] = None
     url: Optional[str] = None
     count: Optional[int] = None
+    query: Optional[str] = None
 
     def __str__(self) -> str:
         return self.model_dump_json(indent=2)
